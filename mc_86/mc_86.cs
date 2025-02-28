@@ -31,14 +31,14 @@ public class mc_86 {
         }
     }
 
-    public static Dictionary<byte, OpInfo> op_codes_7b = new Dictionary<byte, OpInfo>() {
+    public static Dictionary<int, OpInfo> op_codes_7b = new Dictionary<int, OpInfo>() {
         {0b1100011, new OpInfo(Op.mov_imm_rm, "mov")},
         {0b0000010, new OpInfo(Op.add_imm_ac, "add")},
         {0b0010110, new OpInfo(Op.sub_imm_ac, "sub")},
         {0b0011110, new OpInfo(Op.cmp_imm_ac, "cmp")},
     };
 
-    public static Dictionary<byte, OpInfo> op_codes_6b = new Dictionary<byte, OpInfo>() {
+    public static Dictionary<int, OpInfo> op_codes_6b = new Dictionary<int, OpInfo>() {
         {0b100010, new OpInfo(Op.mov_rm_rm, "mov")},
         {0b000000, new OpInfo(Op.add_rm_rm, "add")},
         {0b100000, new OpInfo(Op.add_imm_rm, "add")}, // this matches sub/cmp imm_rm beware
@@ -46,7 +46,7 @@ public class mc_86 {
         {0b001110, new OpInfo(Op.cmp_rm_rm, "cmp")},
     };
 
-    public static Dictionary<byte, OpInfo> op_codes_4b = new Dictionary<byte, OpInfo>() {
+    public static Dictionary<int, OpInfo> op_codes_4b = new Dictionary<int, OpInfo>() {
         {0b1011, new OpInfo(Op.mov_imm_reg, "mov")},
     };
 	
@@ -61,7 +61,10 @@ public class mc_86 {
 			index++;
 			return true;
 		}
-		else if (checkingForNewOp) return false;
+		else if (checkingForNewOp) {
+            debug("checking for new op and finding nothing");
+            return false;
+        }
 	    else {
             Console.WriteLine("uh oh, no more data, but we expected more data!?");
             return false;
@@ -79,7 +82,6 @@ public class mc_86 {
 	}
 	
 	private static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
-	private static void print(string s) => Console.WriteLine(s);
 	private static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
 	private static string GetReg(bool memMode, int regNum, bool w, string disp = "") {
@@ -135,11 +137,23 @@ public class mc_86 {
 		else return regName;
 	}
 
+    public static int GetData(bool w) {
+        if (w) {
+            if (GetByte(out var byte2) && GetByte(out var byte3)) return BitConverter.ToInt16(new byte[] {byte2, byte3});
+        }  
+        else if (GetByte(out var byte2)) return byte2;
+        
+        return 0;
+    }
+
     private static bool ProcessModRegRM(out bool mode, out int reg, out int rm, out string disp) {
         if (GetByte(out byte b)) {
-            int mod = b & (11 << 6);
-            reg = b & (111 << 3);
-            rm = b & 111;
+            int mod = b >> 6;
+            reg = (b >> 3) & 0b111;
+            rm = b & 0b111;
+            debug("mod " + ToBinary(mod));
+            debug("reg " + ToBinary(reg));
+            debug("rm " + ToBinary(rm));
             GetModeAndDisp(mod, rm, out mode, out disp);
             return true;
         }
@@ -165,8 +179,8 @@ public class mc_86 {
             mode = true;
             if (rm == 0b110) {
                 if (GetByte(out var byte3) && GetByte(out var byte4)) {
-                    int value = BitConverter.ToInt16(new byte[] {byte4, byte3});
-                    disp = $" {(value > 0 ? "+" : "-")} {value.ToString()}";
+                    int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
+                    disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
                 }
             }
         }	
@@ -181,31 +195,38 @@ public class mc_86 {
         else if (mod == 0b10) {
             debug("10 mode");
             mode = true;
-            if (GetByte(out var byte3) && GetByte(out var byte4)) disp = $" + {BitConverter.ToInt16(new byte[] {byte3, byte4})}";
+            if (GetByte(out var byte3) && GetByte(out var byte4)) {
+                int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
+                disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
+            }
         }
         else if (mod == 0b11) {
             debug("11 mode");
             mode = false;
         }
         else Console.WriteLine($"error? {mod}");
-
-}
+        debug("memoryMode: " + mode);
+    }
 
     private static void Process() {
 		if (!GetByte(out var byte1, true)) return; // end of ops
+        debug("");
         bool failed = false;
         int b7 = byte1 >> 1;
         int b6 = byte1 >> 2;
         int b4 = byte1 >> 4;
         OpInfo info;
-        if (op_codes_7b.TryGetValue(byte1, out info)) {
+        if (op_codes_7b.TryGetValue(b7, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);       
+            Console.WriteLine("unimplemented");
             failed = true;
         }
-        else if (op_codes_6b.TryGetValue(byte1, out info)) {
+        else if (op_codes_6b.TryGetValue(b6, out info)) {
             debug("found op: " + info.code.ToString() + ", " + info.transfer);
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
+            debug("d: " + d);
+            debug("w: " + w);
             if (info.code == Op.add_imm_rm) {
                 // this could be 1 of 3 actual ops
                 failed = true;
@@ -218,9 +239,11 @@ public class mc_86 {
                 else failed = true;
             }
         }       
-        else if (op_codes_4b.TryGetValue(byte1, out info)) {
-            debug("found op: " + info.transfer);
-            failed = true;
+        else if (op_codes_4b.TryGetValue(b4, out info)) {
+            debug("found op: " + info.code + ", " + info.transfer);
+            bool w = (byte1 & 0b00001000) != 0;
+            int reg = byte1 & 0b00000111;
+            Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {GetData(w)}");
         }
         else {
             Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
@@ -383,12 +406,12 @@ public class mc_86 {
                if (arg == "-d") debugPrints = true; 
             }   
             else {
+                filePath = arg;
+                if (i < args.Length - 1) Console.WriteLine("ignoring extra arguments");
                 break; // maybe it's now a file name
             }     
         }
 
-        // testing
-        if (string.IsNullOrEmpty(filePath)) filePath = "C:\\MaxClark\\perfaw\\listing_0038_many_register_mov";
 		if (File.Exists(filePath)) {
 			content = File.ReadAllBytes(filePath);
 		}
