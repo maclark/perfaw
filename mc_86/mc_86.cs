@@ -8,7 +8,9 @@ public class mc_86 {
         mov_rm_rm,  // 0b100010dw, 0bmodregrm
         mov_imm_rm, // 0b1100011w, 0bmod000rm
         mov_imm_reg,// 0b1011wreg, data...
-        // skipping mem_acc, acc_mem, rm_segr, segr_rm
+        mov_mem_acc,// 0b1010000w, addr-lo, addr-hi
+        mov_acc_mem,// 0b1010001w, addr-lo, addr-hi
+        // skipping mov_rm_segr, mov_segr_rm
         add_rm_rm,  // 0b000000dw, 0bmodregrm
         add_imm_rm, // 0b100000sw, 0bmod000rm (first byte matches 2 others)               
         add_imm_ac, // 0b0000010w, data...                         
@@ -33,6 +35,8 @@ public class mc_86 {
 
     public static Dictionary<int, OpInfo> op_codes_7b = new Dictionary<int, OpInfo>() {
         {0b1100011, new OpInfo(Op.mov_imm_rm, "mov")},
+        {0b1010000, new OpInfo(Op.mov_mem_acc, "mov")},
+        {0b1010001, new OpInfo(Op.mov_acc_mem, "mov")},
         {0b0000010, new OpInfo(Op.add_imm_ac, "add")},
         {0b0010110, new OpInfo(Op.sub_imm_ac, "sub")},
         {0b0011110, new OpInfo(Op.cmp_imm_ac, "cmp")},
@@ -234,7 +238,14 @@ public class mc_86 {
             debug("found op: " + info.code + ", " + info.transfer);       
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
-            if (ProcessModRegRM(out Ids ids)) {
+
+            if (info.code == Op.mov_mem_acc) {
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} ax, [{data}]");
+            }
+            else if (info.code == Op.mov_acc_mem) {
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} [{data}], ax" );
+            }
+            else if (ProcessModRegRM(out Ids ids)) {
                 string description = w ? "word" : "byte";
                 if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {description} {data}");
             }
@@ -270,154 +281,6 @@ public class mc_86 {
         }
         if (!failed) Process();
 	}
-
-
-
-/*private static void ProcessOps() {
-
-		if (!GetByte(out var byte1)) return; // end of ops
-
-		debug(ToBinary(byte1));
-		// check for the 6 bit op...
-		int b7 = byte1 >> 1;
-		int b6 = byte1 >> 2;
-		int b4 = byte1 >> 4;
-
-		bool failed = false;	
-		if (b6 == 0b100010) {
-
-
-
-			bool d = (byte1 & 1 << 1) != 0;
-			bool w = (byte1 & 1) != 0;
-
-			if (GetByte(out var byte2)) {
-				
-				debug(ToBinary(byte2));
-				
-				int mod = byte2 >> 6;
-				int reg = (byte2 >> 3) & 0b00000111;
-				int rm = byte2 & 0b00000111;
-
-				// 00: memory mode, no disp*, except when r/m is 110, then 16-bit disp
-				// 01: memory mode, 8-bit disp
-				// 10: memory mode, 16-bit disp
-				// 11: register mode
-				bool memoryMode = false;
-				string disp = "";
-				if (mod == 0b00) {
-					// check for r/m is 110
-					debug("00 mode");
-					mode = true;
-					if (rm == 0b110) {
-						if (GetByte(out var byte3) && GetByte(out var byte4)) {
-							// maybe it should be {byte4, byte3} bc 2nd byte is "most significant"?
-							disp = $" + {BitConverter.ToInt16(new byte[] {byte4, byte3})}";
-						}
-						else {
-							Console.WriteLine($"mod(e) was 11, but there wasn't another 2 bytes available!");
-							failed = true;
-						}
-					}
-				}	
-				else if (mod == 0b01) {
-					debug("01 mode");
-					mode = true;
-
-					if (GetByte(out var byte3)) {
-						if (byte3 != 0) disp = $" + {byte3}";
-					}
-					else {
-						Console.WriteLine($"mod(e) was 01, but there wasn't another 1 byte available!");
-						failed = true;
-					}
-				}
-				else if (mod == 0b10) {
-					debug("10 mode");
-					mode = true;
-					if (GetByte(out var byte3) && GetByte(out var byte4)) disp = $" + {BitConverter.ToInt16(new byte[] {byte3, byte4})}";
-					else {
-						Console.WriteLine($"mod(e) was 10, but there wasn't another 2 bytes available!");
-						failed = true;
-					}
-				}
-				else if (mod == 0b11) {
-					debug("11 mode");
-					mode = false;
-				}
-				else Console.WriteLine($"error? {mod}");
-				debug("rm: " + ToBinary(rm));
-				debug("d: " + d);
-				debug("w: " + w);
-				if (d) Consol.WriteLine($"mov {GetReg(false, reg, w)}, {GetReg(mode, rm, w, disp)}");
-				else Console.WriteLine($"mov {GetReg(mode, rm, w, disp)}, {GetReg(false, reg, w)}");
-			}
-			else {
-				failed = true;
-				//Console.WriteLine($"couldn't finish processing {op}, not enough bytes");
-			}
-		}
-		else if (b7 == 0b1100011) {
-			Console.WriteLine("how did we end up here? " + ToBinary(b7));
-			if (GetByte(out var byte2)) {
-				//ProcessByte2(byte2, out bool memMode, out int reg, out int rm, out string disp);
-				// note rm is 000
-				//
-				//
-			//	int data;
-			//	if (w) GetInt16(out data);
-			//	else GetByte(out data);
-			//	string disp = GetDisplacement(mod, rm);
-				
-			//	if (memMode) 
-			//	Console.WriteLine("mov " + dest + ", " + src);
-				//WriteASM("mov", d ? , w, memMode, disp);
-			}
-		}	
-		else if (b4 == 0b1011) {
-			//Op op = Op.mov_im_reg;
-			debug(op.ToString());
-			bool w = (byte1 & 0b00001000) != 0;
-			int reg = byte1 & 0b00000111;
-			debug("w: " + w);	
-			if (GetByte(out var byte2)) {
-				debug(ToBinary(byte2));
-				if (w) {
-					if (GetByte(out var byte3)) {
-						int data = BitConverter.ToInt16(new byte[] {byte2, byte3}, 0);
-						Console.WriteLine($"mov {GetReg(false, reg, w)}, {data}");
-					}
-					else {
-						failed = true;
-						Console.WriteLine($"couldn't finish processing {op}, not enough bytes");
-					}
-				}
-				else {
-					Console.WriteLine($"mov {GetReg(false, reg, w)}, {byte2}");
-				}
-
-			}
-			else {
-				failed = true;
-				Console.WriteLine($"couldn't finish processing {op}, not enough bytes");
-			}
-
-
-		}
-		else if (b7 == 0b1010000) {
-			Console.WriteLine("how did we end up here? " + ToBinary(b7));
-		}
-		else if (b7 == 0b1010001) {
-			Console.WriteLine("how did we end up here? " + ToBinary(b7));
-		}
-		else {
-			failed = true;
-			Console.WriteLine($"couldn't extract op code from byte: {Convert.ToString(byte1, 2).PadLeft(8, '0')}");
-		}
-		
-		// we don't know how many bytes to advance, if we didn't successfully process op code!
-		if (!failed) ProcessOps();
-    }*/
 
 	public static void Main(string[] args) {
         string filePath = "";
