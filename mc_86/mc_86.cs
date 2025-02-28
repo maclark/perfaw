@@ -84,9 +84,8 @@ public class mc_86 {
 	private static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
 	private static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
-	private static string GetReg(bool memMode, int regNum, bool w, string disp = "") {
+	private static string GetReg(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
 		string regName = "unknown";
-
 		switch (regNum) {
 			case 0b000:
 				if (memMode) regName = "bx + si";
@@ -119,7 +118,13 @@ public class mc_86 {
 				else regName ="ch";
 				break;
 			case 0b110:
-				if (memMode) regName = "bp";
+				if (memMode) {
+                    if (mod != 0) regName = "bp";
+                    else {
+                        regName = "";
+                        if (disp.Length > 3) disp = disp.Substring(3);
+                    }
+                }
 				else if (w) regName ="si";
 				else regName ="dh";
 				break;
@@ -137,75 +142,83 @@ public class mc_86 {
 		else return regName;
 	}
 
-    public static int GetData(bool w) {
+    public static bool GetData(bool w, out int data) {
+        bool foundData = false;
         if (w) {
-            if (GetByte(out var byte2) && GetByte(out var byte3)) return BitConverter.ToInt16(new byte[] {byte2, byte3});
-        }  
-        else if (GetByte(out var byte2)) return byte2;
-        
-        return 0;
+            if (GetByte(out var data0) && GetByte(out var data1)) {
+                data = BitConverter.ToInt16(new byte[] {data0, data1});
+                foundData = true;
+            } 
+            else data = 0;
+        } 
+        else if (GetByte(out var data0)) {
+            data = data0;
+            foundData = true;
+        }
+        else data = 0;
+        return foundData;
     }
 
-    private static bool ProcessModRegRM(out bool mode, out int reg, out int rm, out string disp) {
+    private static bool ProcessModRegRM(out Ids ids) { 
+        ids = new Ids(); 
         if (GetByte(out byte b)) {
-            int mod = b >> 6;
-            reg = (b >> 3) & 0b111;
-            rm = b & 0b111;
-            debug("mod " + ToBinary(mod));
-            debug("reg " + ToBinary(reg));
-            debug("rm " + ToBinary(rm));
-            GetModeAndDisp(mod, rm, out mode, out disp);
+            ids.mod = b >> 6;
+            ids.reg = (b >> 3) & 0b111;
+            ids.rm = b & 0b111;
+            debug("mod " + ToBinary(ids.mod));
+            debug("reg " + ToBinary(ids.reg));
+            debug("rm " + ToBinary(ids.rm));
+            GetModeAndDisp(ref ids);
             return true;
         }
-        else {
-            mode = false;
-            reg = 0;
-            rm = 0;
-            disp = "";
-            return false;
-        }
+        else return false;
     }
 
-    private static void GetModeAndDisp(int mod, int rm, out bool mode, out string disp) {
+    private static void GetModeAndDisp(ref Ids ids) {
         // 00: memory mode, no disp*, except when r/m is 110, then 16-bit disp
         // 01: memory mode, 8-bit disp
         // 10: memory mode, 16-bit disp
         // 11: register mode
-        mode = false;
-        disp = "";
-        if (mod == 0b00) {
+        if (ids.mod == 0b00) {
             // check for r/m is 110
             debug("00 mode");
-            mode = true;
-            if (rm == 0b110) {
+            ids.memMode = true;
+            if (ids.rm == 0b110) {
                 if (GetByte(out var byte3) && GetByte(out var byte4)) {
                     int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
-                    disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
+                    ids.disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
                 }
             }
         }	
-        else if (mod == 0b01) {
+        else if (ids.mod == 0b01) {
             debug("01 mode");
-            mode = true;
-
+            ids.memMode = true;
             if (GetByte(out var byte3)) {
-                if (byte3 != 0) disp = $" + {byte3}";
+                if (byte3 != 0) ids.disp = $" + {byte3}";
             }
         }
-        else if (mod == 0b10) {
+        else if (ids.mod == 0b10) {
             debug("10 mode");
-            mode = true;
+            ids.memMode = true;
             if (GetByte(out var byte3) && GetByte(out var byte4)) {
                 int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
-                disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
+                ids.disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
             }
         }
-        else if (mod == 0b11) {
+        else if (ids.mod == 0b11) {
             debug("11 mode");
-            mode = false;
+            ids.memMode = false;
         }
-        else Console.WriteLine($"error? {mod}");
-        debug("memoryMode: " + mode);
+        else Console.WriteLine($"error? {ids.mod}");
+        debug("memoryMode: " + ids.memMode);
+    }
+
+    public class Ids {
+        public bool memMode = false;
+        public int mod = 0;
+        public int reg = 0;
+        public int rm = 0;
+        public string disp = "";
     }
 
     private static void Process() {
@@ -216,10 +229,15 @@ public class mc_86 {
         int b6 = byte1 >> 2;
         int b4 = byte1 >> 4;
         OpInfo info;
+        // these are imm_reg stuff
         if (op_codes_7b.TryGetValue(b7, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);       
-            Console.WriteLine("unimplemented");
-            failed = true;
+            bool w = (byte1 & 1) != 0;
+            debug("w: " + w);
+            if (ProcessModRegRM(out Ids ids)) {
+                string description = w ? "word" : "byte";
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {description} {data}");
+            }
         }
         else if (op_codes_6b.TryGetValue(b6, out info)) {
             debug("found op: " + info.code.ToString() + ", " + info.transfer);
@@ -229,12 +247,13 @@ public class mc_86 {
             debug("w: " + w);
             if (info.code == Op.add_imm_rm) {
                 // this could be 1 of 3 actual ops
+                Console.WriteLine("unimplemented...3 ops to choose from now");
                 failed = true;
             }
             else {
-                if (ProcessModRegRM(out bool mode, out int reg, out int rm, out string disp)) {
-                    if (d) Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {GetReg(mode, rm, w, disp)}");
-                    else Console.WriteLine($"{info.transfer} {GetReg(mode, rm, w, disp)}, {GetReg(false, reg, w)}");
+                if (ProcessModRegRM(out Ids ids)) {
+                    if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
+                    else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
                 }
                 else failed = true;
             }
@@ -243,16 +262,18 @@ public class mc_86 {
             debug("found op: " + info.code + ", " + info.transfer);
             bool w = (byte1 & 0b00001000) != 0;
             int reg = byte1 & 0b00000111;
-            Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {GetData(w)}");
+            if (GetData(w, out var data)) Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {data}");
         }
         else {
             Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
             failed = true;
         }
         if (!failed) Process();
-    }
+	}
 
-	/*private static void ProcessOps() {
+
+
+/*private static void ProcessOps() {
 
 		if (!GetByte(out var byte1)) return; // end of ops
 
