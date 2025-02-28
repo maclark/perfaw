@@ -239,11 +239,16 @@ public class mc_86 {
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
 
+            string immReg = w ? "ax" : "al";
             if (info.code == Op.mov_mem_acc) {
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} ax, [{data}]");
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, [{data}]");
             }
             else if (info.code == Op.mov_acc_mem) {
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} [{data}], ax" );
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} [{data}], {immReg}" );
+            }
+            else if (info.code == Op.add_imm_ac || info.code == Op.sub_imm_ac || info.code == Op.cmp_imm_ac) {
+                debug("?_imm_ac");
+                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, {data}");
             }
             else if (ProcessModRegRM(out Ids ids)) {
                 string description = w ? "word" : "byte";
@@ -254,20 +259,33 @@ public class mc_86 {
             debug("found op: " + info.code.ToString() + ", " + info.transfer);
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
-            debug("d: " + d);
             debug("w: " + w);
-            if (info.code == Op.add_imm_rm) {
-                // this could be 1 of 3 actual ops
-                Console.WriteLine("unimplemented...3 ops to choose from now");
-                failed = true;
-            }
-            else {
-                if (ProcessModRegRM(out Ids ids)) {
+            if (ProcessModRegRM(out Ids ids)) {
+                int reg = ids.reg;
+                if (info.code == Op.add_imm_rm) {
+                    // this could be 1 of 3 actual ops
+                    // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
+                    debug("s: " + d);
+                    if (reg == 0b000) info.transfer = "add";
+                    else if (reg == 0b101) info.transfer = "sub";
+                    else if (reg == 0b111) info.transfer = "cmp";
+                    else {
+                        Console.WriteLine($"unhandled 7bit code({info.code})with reg({reg})");
+                        failed = true;
+                    }
+                    int data = 0;
+                    if (!failed) {
+                        if (GetData(!d && w, out data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
+                        else failed = true;
+                    }
+                }
+                else {
+                    debug("d: " + d);
                     if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
                     else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
                 }
-                else failed = true;
             }
+            else failed = true;
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);
