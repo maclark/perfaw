@@ -20,8 +20,26 @@ public class mc_86 {
         cmp_rm_rm,  // 0b001110dw, 0bmodregrm
         cmp_imm_rm, // 0b100000sw, 0bmod111rm (first byte same as add and sub imm_rm)
         cmp_imm_ac, // 0b0011110w, data...
-        jz, // je?
-        jnz, // jne?
+        je,
+        jl,
+        jle,
+        jb,
+        jbe,
+        jp,
+        jo,
+        js,
+        jne,
+        jnl,
+        jnle,
+        jnb,
+        jnbe,
+        jnp,
+        jno,
+        jns,
+        loop,
+        loopz,
+        loopnz,
+        jcxz,
     } 
 
     public struct OpInfo {
@@ -32,6 +50,29 @@ public class mc_86 {
             this.code = code;
         }
     }
+
+    public static Dictionary<int, OpInfo> op_codes_8b = new Dictionary<int, OpInfo>() {
+      {0b01110100, new OpInfo(Op.je, "je")},
+      {0b01111100, new OpInfo(Op.jl, "jl")},
+      {0b01111110, new OpInfo(Op.jle, "jle")},
+      {0b01110010, new OpInfo(Op.jb, "jb")},
+      {0b01110110, new OpInfo(Op.jbe, "jbe")},
+      {0b01111010, new OpInfo(Op.jp, "jp")},
+      {0b01110000, new OpInfo(Op.jo, "jo")},
+      {0b01111000, new OpInfo(Op.js, "js")},
+      {0b01110101, new OpInfo(Op.jne, "jne")},
+      {0b01111101, new OpInfo(Op.jnl, "jnl")},
+      {0b01111111, new OpInfo(Op.jnle, "jnle")},
+      {0b01110011, new OpInfo(Op.jnb, "jnb")},
+      {0b01110111, new OpInfo(Op.jnbe, "jnbe")},
+      {0b01111011, new OpInfo(Op.jnp, "jnp")},
+      {0b01110001, new OpInfo(Op.jno, "jno")},
+      {0b01111001, new OpInfo(Op.jns, "jns")},
+      {0b11100010, new OpInfo(Op.loop, "loop")},
+      {0b11100001, new OpInfo(Op.loopz, "loopz")},
+      {0b11100000, new OpInfo(Op.loopnz, "loopnz")},
+      {0b11100011, new OpInfo(Op.jcxz, "jcxz")},
+    };
 
     public static Dictionary<int, OpInfo> op_codes_7b = new Dictionary<int, OpInfo>() {
         {0b1100011, new OpInfo(Op.mov_imm_rm, "mov")},
@@ -225,21 +266,29 @@ public class mc_86 {
         public string disp = "";
     }
 
-    private static void Process() {
-		if (!GetByte(out var byte1, true)) return; // end of ops
+    private static bool Process() {
+		if (!GetByte(out var byte1, true)) return false; // end of ops
         debug("");
-        bool failed = false;
+        bool success = true;
         int b7 = byte1 >> 1;
         int b6 = byte1 >> 2;
         int b4 = byte1 >> 4;
         OpInfo info;
+        if (op_codes_8b.TryGetValue(byte1, out info)) {
+            // conditional jumps, all have 8 bits following
+            if (GetByte(out var pointer)) {
+                sbyte spointer = (sbyte)pointer;
+                Console.WriteLine($"{info.transfer} {spointer}");
+            }
+            else success = false; 
+        }
         // these are imm_reg stuff
-        if (op_codes_7b.TryGetValue(b7, out info)) {
+        else if (op_codes_7b.TryGetValue(b7, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);       
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
 
-            string immReg = w ? "ax" : "al";
+            string immReg = w ? "ax" : "al"; // looks like 0b11 is ax imm, and 0b10 is al imm, nothing else in book
             if (info.code == Op.mov_mem_acc) {
                 if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, [{data}]");
             }
@@ -266,17 +315,27 @@ public class mc_86 {
                     // this could be 1 of 3 actual ops
                     // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
                     debug("s: " + d);
+                    bool s = d;
+                    if (s || !w) debug("(s or !w), might be problematic");
                     if (reg == 0b000) info.transfer = "add";
                     else if (reg == 0b101) info.transfer = "sub";
                     else if (reg == 0b111) info.transfer = "cmp";
                     else {
                         Console.WriteLine($"unhandled 7bit code({info.code})with reg({reg})");
-                        failed = true;
+                        success = false;
                     }
                     int data = 0;
-                    if (!failed) {
-                        if (GetData(!d && w, out data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                        else failed = true;
+                    if (success) {
+                        // from table 4-13 just listing out the possibilities...
+                        // 00 reg8, imm8
+                        // 01 reg16, imm16
+                        // 10 reg8, imm8
+                        // 11 reg16, imm8
+                        // so if w is 0, both are small
+                        // manual had  "if s: w=01"
+                        // manual had  "if s: w=1" for CMP, which is confusing
+                        if (GetData(!s && w, out data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
+                        else success = false;
                     }
                 }
                 else {
@@ -285,7 +344,7 @@ public class mc_86 {
                     else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
                 }
             }
-            else failed = true;
+            else success = false;
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);
@@ -295,9 +354,9 @@ public class mc_86 {
         }
         else {
             Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
-            failed = true;
+            success = false;
         }
-        if (!failed) Process();
+        return success;
 	}
 
 	public static void Main(string[] args) {
@@ -328,6 +387,8 @@ public class mc_86 {
 		}
 		
 		Console.WriteLine($"processing file {filePath}");
-		Process();
+        while (index < content.Length) {
+            if (!Process()) break;
+        }
     }   	
 }
