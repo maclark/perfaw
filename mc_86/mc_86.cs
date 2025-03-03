@@ -3,7 +3,7 @@ using System.IO;
 
 
 public class mc_86 {
-
+	public float x;
     public enum Op {
         mov_rm_rm,  // 0b100010dw, 0bmodregrm
         mov_imm_rm, // 0b1100011w, 0bmod000rm
