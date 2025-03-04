@@ -1,6 +1,7 @@
 using System;
 using System.IO;
-
+// uncomment out the <c-u> command in _vimrc for going up half a page
+// it is the complement of <c-d> for going down half a page
 
 public class mc_86 {
     /*
