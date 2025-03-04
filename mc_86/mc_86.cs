@@ -3,7 +3,26 @@ using System.IO;
 
 
 public class mc_86 {
-	public float x;
+    /*
+ * now we're supposed to add processing for moves
+ *  so we're supposed to make registers and track them 
+ *
+ *
+ *
+ */
+
+    public enum RegName {
+        Reg_a,
+        Reg_b,
+        Reg_c,
+    }
+
+    public struct Reg {
+        public string name;
+        public byte high;
+        public byte low;
+    }
+
     public enum Op {
         mov_rm_rm,  // 0b100010dw, 0bmodregrm
         mov_imm_rm, // 0b1100011w, 0bmod000rm
