@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+
 // uncomment out the <c-u> command in _vimrc for going up half a page
 // it is the complement of <c-d> for going down half a page
 
@@ -12,16 +13,32 @@ public class mc_86 {
  *
  */
 
-    public enum RegName {
-        Reg_a,
-        Reg_b,
-        Reg_c,
-    }
 
     public struct Reg {
         public string name;
         public byte high;
         public byte low;
+        
+        public Reg(string name, byte lo, byte hi) {
+            this.name = name;
+            this.low = lo;
+            this.high = hi;
+        }
+
+        public Reg(string name) {
+            this.name = name;
+            high = 0;
+            low = 0;
+        }
+        
+        public int GetValue() {
+            if (high != 0) {
+                return BitConverter.ToInt16(new byte[] { high, low });
+            }
+            else {
+                return low;
+            }
+        }
     }
 
     public enum Op {
@@ -61,6 +78,18 @@ public class mc_86 {
         loopnz,
         jcxz,
     } 
+
+    public static Dictionary<string, Reg> reg_lookup = new Dictionary<string, Reg>() {
+        { "ax", new Reg("ax") },
+        { "bx", new Reg("bx") },
+        { "cx", new Reg("cx") },
+        { "dx", new Reg("dx") },
+        { "sp", new Reg("sp") },
+        { "bp", new Reg("bp") },
+        { "si", new Reg("si") },
+        { "di", new Reg("di") },
+
+    };
 
     public struct OpInfo {
         public string transfer;
@@ -146,6 +175,14 @@ public class mc_86 {
 		else return false;
 	}
 	
+    public static string ToHex(int h) { 
+        byte[] bytes = (byte[])BitConverter.GetBytes(h);
+        Array.Reverse(bytes);
+        string s = BitConverter.ToString(bytes).Replace("-","").TrimStart('0');
+        if (string.IsNullOrEmpty(s)) s = "0";
+        return $"0x{s}"; 
+    }
+
 	private static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
 	private static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
@@ -224,7 +261,7 @@ public class mc_86 {
         return foundData;
     }
 
-    private static bool ProcessModRegRM(out Ids ids) { 
+    private static bool ParseModRegRM(out Ids ids) { 
         ids = new Ids(); 
         if (GetByte(out byte b)) {
             ids.mod = b >> 6;
@@ -304,6 +341,7 @@ public class mc_86 {
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
+            debug("shouldn't we be here?");
             debug("found op: " + info.code + ", " + info.transfer);       
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
@@ -319,7 +357,8 @@ public class mc_86 {
                 debug("?_imm_ac");
                 if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, {data}");
             }
-            else if (ProcessModRegRM(out Ids ids)) {
+            else if (ParseModRegRM(out Ids ids)) {
+                // these are the ones we'll first process
                 string description = w ? "word" : "byte";
                 if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {description} {data}");
             }
@@ -329,7 +368,7 @@ public class mc_86 {
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
-            if (ProcessModRegRM(out Ids ids)) {
+            if (ParseModRegRM(out Ids ids)) {
                 int reg = ids.reg;
                 if (info.code == Op.add_imm_rm) {
                     // this could be 1 of 3 actual ops
@@ -360,8 +399,13 @@ public class mc_86 {
                 }
                 else {
                     debug("d: " + d);
+                    debug("i guess we're here?");
                     if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                    else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                    else {
+                        debug("i guess we're actually here?");
+                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                        
+                    }
                 }
             }
             else success = false;
@@ -369,8 +413,29 @@ public class mc_86 {
         else if (op_codes_4b.TryGetValue(b4, out info)) {
             debug("found op: " + info.code + ", " + info.transfer);
             bool w = (byte1 & 0b00001000) != 0;
-            int reg = byte1 & 0b00000111;
-            if (GetData(w, out var data)) Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {data}");
+            int regNum = byte1 & 0b00000111;
+            string regName = GetReg(false, regNum, w);
+            debug("w: " + w);
+            if (reg_lookup.TryGetValue(regName, out Reg reg)) {
+                if (w) {
+                    string cached = ToHex(reg.GetValue());
+                    GetByte(out var b0);
+                    GetByte(out var b1);
+                    int data = BitConverter.ToInt16(new byte[] { b0, b1 });
+                    Console.WriteLine($"mov {regName}, {data} ; {regName}:{cached}->{ToHex(data)}");
+                    reg_lookup[regName] = new Reg(regName, b0, b1);
+                }
+                else if (GetByte(out var b)) {
+                    debug("lower lower lower");
+                    reg.low = b;
+                    Console.WriteLine($"mov {regName}, {b} ; {regName}:{ToHex(reg.GetValue())}->{ToHex(b)}");
+                }
+                else success = false;
+            }
+            else {
+                if (GetData(w, out var data)) Console.WriteLine($"{info.transfer} {GetReg(false, regNum, w)}, {data}");
+                else success = false;
+            }
         }
         else {
             Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
@@ -409,6 +474,12 @@ public class mc_86 {
 		Console.WriteLine($"processing file {filePath}");
         while (index < content.Length) {
             if (!Process()) break;
+        }
+
+        Console.WriteLine("Final registers:");
+        foreach (var pair in reg_lookup) {
+            int data = pair.Value.GetValue();
+            Console.WriteLine($"     {pair.Key}: {ToHex(data)} ({data})");
         }
     }   	
 }
