@@ -1,41 +1,8 @@
 using System;
 using System.IO;
-<<<<<<< Updated upstream
-
-// uncomment out the <c-u> command in _vimrc for going up half a page
-// it is the complement of <c-d> for going down half a page
-=======
->>>>>>> Stashed changes
 
 public class mc_86 {
 
-<<<<<<< Updated upstream
-
-    public struct Reg {
-        public string name;
-        public byte high;
-        public byte low;
-        
-        public Reg(string name, byte lo, byte hi) {
-            this.name = name;
-            this.low = lo;
-            this.high = hi;
-        }
-
-        public Reg(string name) {
-            this.name = name;
-            high = 0;
-            low = 0;
-        }
-        
-        public int GetValue() {
-            if (high != 0) {
-                return BitConverter.ToInt16(new byte[] { high, low });
-            }
-            else {
-                return low;
-            }
-=======
     public class Reg {
         public string name;
         public byte hi;
@@ -45,7 +12,6 @@ public class mc_86 {
             this.name = name;
             hi = 0;
             lo = 0;
->>>>>>> Stashed changes
         }
     }
 
@@ -59,6 +25,7 @@ public class mc_86 {
         new Reg("si"),
         new Reg("di"),
     };
+
     public enum Op {
         mov_rm_rm,  // 0b100010dw, 0bmodregrm
         mov_imm_rm, // 0b1100011w, 0bmod000rm
@@ -95,19 +62,7 @@ public class mc_86 {
         loopnz,
         jcxz,
     } 
-
-    public static Dictionary<string, Reg> reg_lookup = new Dictionary<string, Reg>() {
-        { "ax", new Reg("ax") },
-        { "bx", new Reg("bx") },
-        { "cx", new Reg("cx") },
-        { "dx", new Reg("dx") },
-        { "sp", new Reg("sp") },
-        { "bp", new Reg("bp") },
-        { "si", new Reg("si") },
-        { "di", new Reg("di") },
-
-    };
-
+    
     public struct OpInfo {
         public string transfer;
         public Op code;
@@ -164,34 +119,26 @@ public class mc_86 {
     private static bool debugPrints = false;
 	private static byte[] content = new byte[0];
 	private static int index = 0;
-
-	private static bool GetByte(out byte b, bool checkingForNewOp=false) {
-		b = 255;
-		if (index < content.Length) {
-			b = content[index];
-			index++;
-			return true;
-		}
-		else if (checkingForNewOp) {
-            debug("checking for new op and finding nothing");
-            return false;
-        }
-	    else {
-            Console.WriteLine("uh oh, no more data, but we expected more data!?");
-            return false;
-        }
+    private static bool in_bounds = false;
+    
+    public static int ToInt16(byte lo, byte hi) 
+    {
+        return BitConverter.ToInt16(new byte[] { lo, hi });
     }
 
-	private static bool GetInt16(out int i) {
-		i = 0;
-		if (index < content.Length - 1) {
-			BitConverter.ToInt16(new byte[] {content[index], content[index + 1]});
-			index += 2;
-			return true;
-		}
-		else return false;
-	}
-	
+    private static byte NextByte() 
+    {
+        if (index >= content.Length) 
+        {
+            index = 0;
+            in_bounds = false;
+            Console.WriteLine("WARNING: we've gone out of bounds!");
+        }
+        byte b = content[index];
+        index++;
+        return b;
+    }
+
     public static string ToHex(int h) { 
         byte[] bytes = (byte[])BitConverter.GetBytes(h);
         Array.Reverse(bytes);
@@ -200,11 +147,10 @@ public class mc_86 {
         return $"0x{s}"; 
     }
 
-	private static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
+	public static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
 	public static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
-    
-	private static Reg GetRegister(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
+	public static Reg GetRegister(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
 		string regName = "unknown";
 		switch (regNum) {
 			case 0b000:
@@ -260,7 +206,7 @@ public class mc_86 {
 
         if (memMode) Console.WriteLine("WARNING: we're supposed to get a register, but we're in memory mode?");
         
-        Reg reg = registers.Find(r => r.name == regName);
+        Reg? reg = registers.Find(r => r.name == regName);
         if (reg == null) return new Reg("blank");
         else return reg;
 		//if (memMode) return $"[{regName}{disp}]";
@@ -326,36 +272,16 @@ public class mc_86 {
 		else return regName;
 	}
 
-    public static bool GetData(bool w, out int data) {
-        bool foundData = false;
-        if (w) {
-            if (GetByte(out var data0) && GetByte(out var data1)) {
-                data = BitConverter.ToInt16(new byte[] {data0, data1});
-                foundData = true;
-            } 
-            else data = 0;
-        } 
-        else if (GetByte(out var data0)) {
-            data = data0;
-            foundData = true;
-        }
-        else data = 0;
-        return foundData;
-    }
-
-    private static bool ParseModRegRM(out Ids ids) { 
-        ids = new Ids(); 
-        if (GetByte(out byte b)) {
-            ids.mod = b >> 6;
-            ids.reg = (b >> 3) & 0b111;
-            ids.rm = b & 0b111;
-            debug("mod " + ToBinary(ids.mod));
-            debug("reg " + ToBinary(ids.reg));
-            debug("rm " + ToBinary(ids.rm));
-            GetModeAndDisp(ref ids);
-            return true;
-        }
-        else return false;
+    private static void ParseModRegRM(out Ids ids) { 
+        ids = new Ids();
+        byte b = NextByte();
+        ids.mod = b >> 6;
+        ids.reg = (b >> 3) & 0b111;
+        ids.rm = b & 0b111;
+        debug("mod " + ToBinary(ids.mod));
+        debug("reg " + ToBinary(ids.reg));
+        debug("rm " + ToBinary(ids.rm));
+        GetModeAndDisp(ref ids);
     }
 
     private static void GetModeAndDisp(ref Ids ids) {
@@ -368,26 +294,25 @@ public class mc_86 {
             debug("00 mode");
             ids.memMode = true;
             if (ids.rm == 0b110) {
-                if (GetByte(out var byte3) && GetByte(out var byte4)) {
-                    int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
-                    ids.disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
-                }
+                ids.b0 = NextByte();
+                ids.b1 = NextByte();
+                ids.data = BitConverter.ToInt16(new byte[] { ids.b0, ids.b1 });
+                ids.disp = $" {(ids.data > 0 ? "+" : "-")} {Math.Abs(ids.data).ToString()}";
             }
         }	
         else if (ids.mod == 0b01) {
             debug("01 mode");
             ids.memMode = true;
-            if (GetByte(out var byte3)) {
-                if (byte3 != 0) ids.disp = $" + {byte3}";
-            }
+            ids.b0 = NextByte();
+            if (ids.b0 != 0) ids.disp = $" + {ids.b0}";
         }
         else if (ids.mod == 0b10) {
             debug("10 mode");
             ids.memMode = true;
-            if (GetByte(out var byte3) && GetByte(out var byte4)) {
-                int value = BitConverter.ToInt16(new byte[] {byte3, byte4});
-                ids.disp = $" {(value > 0 ? "+" : "-")} {Math.Abs(value).ToString()}";
-            }
+            ids.b0 = NextByte();
+            ids.b1 = NextByte();
+            ids.data = BitConverter.ToInt16(new byte[] { ids.b0, ids.b1 });
+            ids.disp = $" {(ids.data > 0 ? "+" : "-")} {Math.Abs(ids.data).ToString()}";
         }
         else if (ids.mod == 0b11) {
             debug("11 mode");
@@ -402,51 +327,80 @@ public class mc_86 {
         public int mod = 0;
         public int reg = 0;
         public int rm = 0;
+        public byte b0;
+        public byte b1;
+        public int data;
         public string disp = "";
     }
 
-    private static bool Process() {
-		if (!GetByte(out var byte1, true)) return false; // end of ops
+    private static void Process() {
+        // probably not necessary, i think we're going to print out the "WARNING" every time
+        if (index >= content.Length) return;
+        byte byte1 = NextByte();
         debug("");
-        bool success = true;
         int b7 = byte1 >> 1;
         int b6 = byte1 >> 2;
         int b4 = byte1 >> 4;
         OpInfo info;
         if (op_codes_8b.TryGetValue(byte1, out info)) {
             // conditional jumps, all have 8 bits following
-            if (GetByte(out var pointer)) {
-                sbyte spointer = (sbyte)pointer;
-                Console.WriteLine($"{info.transfer} {spointer}");
-            }
-            else success = false; 
+            debug("conditional jump");
+            sbyte spointer = (sbyte)NextByte();
+            Console.WriteLine($"{info.transfer} {spointer}");
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
-<<<<<<< Updated upstream
             debug("shouldn't we be here?");
             debug("found op: " + info.code + ", " + info.transfer);       
-=======
             debug("(7b)found op: " + info.code + ", " + info.transfer);       
->>>>>>> Stashed changes
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
-
             string immReg = w ? "ax" : "al"; // looks like 0b11 is ax imm, and 0b10 is al imm, nothing else in book
             if (info.code == Op.mov_mem_acc) {
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, [{data}]");
+                byte byte2 = NextByte();
+                if (w) 
+                {
+                    byte byte3 = NextByte();    
+                    int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
+                    Console.WriteLine($"{info.transfer} {immReg}, [{data}]");
+                }
+                else Console.WriteLine($"{info.transfer} {immReg}, [{byte2}]");
             }
             else if (info.code == Op.mov_acc_mem) {
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} [{data}], {immReg}" );
+                byte byte2 = NextByte();
+                if (w) 
+                {
+                    byte byte3 = NextByte();    
+                    int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
+                    Console.WriteLine($"{info.transfer} [{data}], {immReg}");
+                }
+                else Console.WriteLine($"{info.transfer} [{byte2}], {immReg}");
             }
             else if (info.code == Op.add_imm_ac || info.code == Op.sub_imm_ac || info.code == Op.cmp_imm_ac) {
                 debug("?_imm_ac");
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {immReg}, {data}");
+                byte byte2 = NextByte();
+                if (w) 
+                {
+                    byte byte3 = NextByte();    
+                    int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
+                    Console.WriteLine($"{info.transfer} {immReg}, [{data}]");
+                }
+                else Console.WriteLine($"{info.transfer} {immReg}, [{byte2}]");
             }
-            else if (ParseModRegRM(out Ids ids)) {
+            else 
+            {
+                ParseModRegRM(out Ids ids);
                 // these are the ones we'll first process
                 string description = w ? "word" : "byte";
-                if (GetData(w, out int data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {description} {data}");
+                byte b0_data = NextByte();
+                string data ="";
+                if (w) 
+                {
+                    byte b1_data = NextByte();    
+                    data = BitConverter.ToInt16(new byte[] { b0_data, b1_data }).ToString();
+                }
+                else data = b0_data.ToString();
+                Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {description} {data}");
             }
         }
         else if (op_codes_6b.TryGetValue(b6, out info)) {
@@ -454,109 +408,101 @@ public class mc_86 {
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
-            if (ParseModRegRM(out Ids ids)) {
-                int reg = ids.reg;
-                if (info.code == Op.add_imm_rm) {
-                    // this could be 1 of 3 actual ops
-                    // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
-                    debug("s: " + d);
-                    bool s = d;
-                    if (s || !w) debug("(s or !w), might be problematic");
-                    if (reg == 0b000) info.transfer = "add";
-                    else if (reg == 0b101) info.transfer = "sub";
-                    else if (reg == 0b111) info.transfer = "cmp";
-                    else {
-                        Console.WriteLine($"unhandled 6bit code({info.code})with reg({reg})");
-                        success = false;
+            ParseModRegRM(out Ids ids);
+            
+            int reg = ids.reg;
+            if (info.code == Op.add_imm_rm) {
+                // this could be 1 of 3 actual ops
+                // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
+                debug("s: " + d);
+                bool s = d;
+                bool handled = true;
+                if (s || !w) debug("(s or !w), might be problematic");
+                if (reg == 0b000) info.transfer = "add";
+                else if (reg == 0b101) info.transfer = "sub";
+                else if (reg == 0b111) info.transfer = "cmp";
+                else 
+                {
+                    handled = false;
+                    Console.WriteLine($"unhandled 6bit code({info.code})with reg({reg})");
+                }
+                if (handled) {
+                    // from table 4-13 just listing out the possibilities...
+                    // 00 reg8, imm8
+                    // 01 reg16, imm16
+                    // 10 reg8, imm8
+                    // 11 reg16, imm8
+                    // so if w is 0, both are small
+                    // manual had  "if s: w=01"
+                    // manual had  "if s: w=1" for CMP, which is confusing
+                    if (!s && w) 
+                    {
+                        byte lo = NextByte();
+                        byte hi = NextByte();
+                        int data = ToInt16(lo, hi);
+                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
                     }
-                    int data = 0;
-                    if (success) {
-                        // from table 4-13 just listing out the possibilities...
-                        // 00 reg8, imm8
-                        // 01 reg16, imm16
-                        // 10 reg8, imm8
-                        // 11 reg16, imm8
-                        // so if w is 0, both are small
-                        // manual had  "if s: w=01"
-                        // manual had  "if s: w=1" for CMP, which is confusing
-                        if (GetData(!s && w, out data)) Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                        else success = false;
+                    else 
+                    {
+                        int data = NextByte(); 
+                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
                     }
                 }
                 else {
                     // mov/add/sub/cmp rm rm
                     debug("d: " + d);
-<<<<<<< Updated upstream
                     debug("i guess we're here?");
                     if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
                     else {
                         debug("i guess we're actually here?");
                         Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
-                        
-                    }
-=======
-                    Reg src;
-                    Reg dest;
-                
-                    if (d) 
-                    {
-                        Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                        dest = GetRegister(false, ids.reg, w);
-                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                    }
-                    else
-                    {
-                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
-                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                        src = GetRegister(false, ids.reg, w);
-                    }
-                    Exec.MoveRmRm(dest, src, w);
->>>>>>> Stashed changes
+                    }    
                 }
             }
-            else success = false;
+            
+            Reg src;
+            Reg dest;
+            if (d) 
+            {
+                Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
+                dest = GetRegister(false, ids.reg, w);
+                src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+            }
+            else
+            {
+                Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                src = GetRegister(false, ids.reg, w);
+            }
+            Exec.MoveRmRm(dest, src, w);
+            
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
             debug("(4b)found op: " + info.code + ", " + info.transfer);
+            // i believe the only 4b op code we have is imm_reg
             bool w = (byte1 & 0b00001000) != 0;
-<<<<<<< Updated upstream
             int regNum = byte1 & 0b00000111;
-            string regName = GetReg(false, regNum, w);
+            //string regName = GetReg(false, regNum, w);
+            Reg reg = GetRegister(false, regNum, w);
             debug("w: " + w);
-            if (reg_lookup.TryGetValue(regName, out Reg reg)) {
-                if (w) {
-                    string cached = ToHex(reg.GetValue());
-                    GetByte(out var b0);
-                    GetByte(out var b1);
-                    int data = BitConverter.ToInt16(new byte[] { b0, b1 });
-                    Console.WriteLine($"mov {regName}, {data} ; {regName}:{cached}->{ToHex(data)}");
-                    reg_lookup[regName] = new Reg(regName, b0, b1);
-                }
-                else if (GetByte(out var b)) {
-                    debug("lower lower lower");
-                    reg.low = b;
-                    Console.WriteLine($"mov {regName}, {b} ; {regName}:{ToHex(reg.GetValue())}->{ToHex(b)}");
-                }
-                else success = false;
-            }
-            else {
-                if (GetData(w, out var data)) Console.WriteLine($"{info.transfer} {GetReg(false, regNum, w)}, {data}");
-                else success = false;
-=======
-            int reg = byte1 & 0b00000111;
-            if (GetData(w, out var data)) 
+            if (w) 
             {
-                Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {data}");
-                Reg r = GetRegister(false, reg, w);
-                MoveRmImm(reg, w, data);
->>>>>>> Stashed changes
+                string cached = ToHex(ToInt16(reg.lo, reg.hi));
+                reg.lo = NextByte();
+                reg.hi = NextByte();
+                int data = ToInt16(reg.lo, reg.hi);
+                Console.WriteLine($"mov {reg.name}, {data} ; {reg.name}:{cached}->{ToHex(data)}");
+            }
+            else
+            {
+                debug("lower lower lower");
+                if (reg.hi != 0) Console.WriteLine("how do we handle printing out registers who had non zero hi bits and had their lo bits changed?");
+                string cached = ToHex(reg.lo);
+                reg.lo = NextByte();
+                Console.WriteLine($"mov {reg.name}, {reg.lo} ; {reg.name}:{cached}->{ToHex(reg.lo)}");
             }
         }
-        else {
-            Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
-            success = false;
-        }
-        return success;
+        else Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
 	}
 
 	public static void Main(string[] args) {
@@ -587,20 +533,16 @@ public class mc_86 {
 		}
 		
 		Console.WriteLine($"processing file {filePath}");
-        while (index < content.Length) {
-            if (!Process()) break;
+        in_bounds = true;
+        index = 0;
+        while (index < content.Length && in_bounds) {
+            Process();
         }
 
-        Console.WriteLine("Final registers:");
-<<<<<<< Updated upstream
-        foreach (var pair in reg_lookup) {
-            int data = pair.Value.GetValue();
-            Console.WriteLine($"     {pair.Key}: {ToHex(data)} ({data})");
-=======
+        Console.WriteLine("\nFinal registers:");
         for (int i = 0; i < registers.Count; i++) {
             Reg r = registers[i];
             Console.WriteLine($"    {r.name}: {r.lo}");
->>>>>>> Stashed changes
         }
     }   	
 }
