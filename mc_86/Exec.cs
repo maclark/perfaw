@@ -3,7 +3,7 @@ using System;
 
 public static class Exec {
 
-    public static void MoveRmImm(mc_86.Reg dest, bool w, int data) 
+    public static void MoveRmImm(mc_86.Reg dest, bool w, byte lo, byte hi) 
     //public static void MoveRmImm(mc_86.Reg dest, bool w, byte hi, byte low) 
     {
         // i assume if w is false, we leave the high bits undisturbed?
@@ -25,11 +25,8 @@ public static class Exec {
             dest.hi = 0;
             dest.lo = src.lo;
         }
-        Console.WriteLine("w: " + w);
-        //mc_86.debug(dest.name + " now has " + dest.lo);
-        Console.WriteLine(src.name + " src had " + src.lo);
-        Console.WriteLine(dest.name + " now has " + dest.lo);
+        mc_86.debug("w: " + w);
+        mc_86.debug(src.name + " src had " + src.lo);
+        mc_86.debug(dest.name + " now has " + dest.lo);
     } 
-
-
 }
