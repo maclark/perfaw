@@ -1,18 +1,15 @@
 using System;
 using System.IO;
+<<<<<<< Updated upstream
 
 // uncomment out the <c-u> command in _vimrc for going up half a page
 // it is the complement of <c-d> for going down half a page
+=======
+>>>>>>> Stashed changes
 
 public class mc_86 {
-    /*
- * now we're supposed to add processing for moves
- *  so we're supposed to make registers and track them 
- *
- *
- *
- */
 
+<<<<<<< Updated upstream
 
     public struct Reg {
         public string name;
@@ -38,16 +35,36 @@ public class mc_86 {
             else {
                 return low;
             }
+=======
+    public class Reg {
+        public string name;
+        public byte hi;
+        public byte lo;
+        public Reg(string name) 
+        {
+            this.name = name;
+            hi = 0;
+            lo = 0;
+>>>>>>> Stashed changes
         }
     }
 
+    public static List<Reg> registers = new List<Reg>() {
+        new Reg("ax"),
+        new Reg("bx"),
+        new Reg("cx"),
+        new Reg("dx"),
+        new Reg("sp"),
+        new Reg("bp"),
+        new Reg("si"),
+        new Reg("di"),
+    };
     public enum Op {
         mov_rm_rm,  // 0b100010dw, 0bmodregrm
         mov_imm_rm, // 0b1100011w, 0bmod000rm
         mov_imm_reg,// 0b1011wreg, data...
         mov_mem_acc,// 0b1010000w, addr-lo, addr-hi
         mov_acc_mem,// 0b1010001w, addr-lo, addr-hi
-        // skipping mov_rm_segr, mov_segr_rm
         add_rm_rm,  // 0b000000dw, 0bmodregrm
         add_imm_rm, // 0b100000sw, 0bmod000rm (first byte matches 2 others)               
         add_imm_ac, // 0b0000010w, data...                         
@@ -184,7 +201,72 @@ public class mc_86 {
     }
 
 	private static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
-	private static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
+	public static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
+
+    
+	private static Reg GetRegister(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
+		string regName = "unknown";
+		switch (regNum) {
+			case 0b000:
+				if (memMode) regName = "bx + si";
+				else if (w) regName = "ax";
+				else regName = "al";
+				break;
+			case 0b001:
+				if (memMode) regName = "bx + di";
+				else if (w) regName ="cx";
+				else regName ="cl";
+				break;
+			case 0b010:
+				if (memMode) regName = "bp + si";
+				else if (w) regName ="dx";
+				else regName ="dl";
+				break;
+			case 0b011:
+				if (memMode) regName = "bp + di";
+				else if (w) regName ="bx";
+				else regName ="bl";
+				break;
+			case 0b100:
+				if (memMode) regName = "si";
+				else if (w) regName ="sp";
+				else regName ="ah";
+				break;
+			case 0b101:
+				if (memMode) regName = "di";
+				else if (w) regName ="bp";
+				else regName ="ch";
+				break;
+			case 0b110:
+				if (memMode) {
+                    if (mod != 0) regName = "bp";
+                    else {
+                        regName = "";
+                        if (disp.Length > 3) disp = disp.Substring(3);
+                    }
+                }
+				else if (w) regName ="si";
+				else regName ="dh";
+				break;
+			case 0b111:
+				if (memMode) regName = "bx";
+				else if (w) regName = "di";
+                else regName ="bh";
+				break;
+			default:
+				Console.WriteLine($"unhandled register number: {Convert.ToString(regNum, 2)}");
+				break;
+		}
+
+        if (memMode) Console.WriteLine("WARNING: we're supposed to get a register, but we're in memory mode?");
+        
+        Reg reg = registers.Find(r => r.name == regName);
+        if (reg == null) return new Reg("blank");
+        else return reg;
+		//if (memMode) return $"[{regName}{disp}]";
+		//else return regName;
+	}
+
 
 	private static string GetReg(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
 		string regName = "unknown";
@@ -341,8 +423,12 @@ public class mc_86 {
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
+<<<<<<< Updated upstream
             debug("shouldn't we be here?");
             debug("found op: " + info.code + ", " + info.transfer);       
+=======
+            debug("(7b)found op: " + info.code + ", " + info.transfer);       
+>>>>>>> Stashed changes
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
 
@@ -364,7 +450,7 @@ public class mc_86 {
             }
         }
         else if (op_codes_6b.TryGetValue(b6, out info)) {
-            debug("found op: " + info.code.ToString() + ", " + info.transfer);
+            debug("(6bit)found op: " + info.code.ToString() + ", " + info.transfer);
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
@@ -380,7 +466,7 @@ public class mc_86 {
                     else if (reg == 0b101) info.transfer = "sub";
                     else if (reg == 0b111) info.transfer = "cmp";
                     else {
-                        Console.WriteLine($"unhandled 7bit code({info.code})with reg({reg})");
+                        Console.WriteLine($"unhandled 6bit code({info.code})with reg({reg})");
                         success = false;
                     }
                     int data = 0;
@@ -398,7 +484,9 @@ public class mc_86 {
                     }
                 }
                 else {
+                    // mov/add/sub/cmp rm rm
                     debug("d: " + d);
+<<<<<<< Updated upstream
                     debug("i guess we're here?");
                     if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
                     else {
@@ -406,13 +494,32 @@ public class mc_86 {
                         Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
                         
                     }
+=======
+                    Reg src;
+                    Reg dest;
+                
+                    if (d) 
+                    {
+                        Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
+                        dest = GetRegister(false, ids.reg, w);
+                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                        src = GetRegister(false, ids.reg, w);
+                    }
+                    Exec.MoveRmRm(dest, src, w);
+>>>>>>> Stashed changes
                 }
             }
             else success = false;
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
-            debug("found op: " + info.code + ", " + info.transfer);
+            debug("(4b)found op: " + info.code + ", " + info.transfer);
             bool w = (byte1 & 0b00001000) != 0;
+<<<<<<< Updated upstream
             int regNum = byte1 & 0b00000111;
             string regName = GetReg(false, regNum, w);
             debug("w: " + w);
@@ -435,6 +542,14 @@ public class mc_86 {
             else {
                 if (GetData(w, out var data)) Console.WriteLine($"{info.transfer} {GetReg(false, regNum, w)}, {data}");
                 else success = false;
+=======
+            int reg = byte1 & 0b00000111;
+            if (GetData(w, out var data)) 
+            {
+                Console.WriteLine($"{info.transfer} {GetReg(false, reg, w)}, {data}");
+                Reg r = GetRegister(false, reg, w);
+                MoveRmImm(reg, w, data);
+>>>>>>> Stashed changes
             }
         }
         else {
@@ -477,9 +592,15 @@ public class mc_86 {
         }
 
         Console.WriteLine("Final registers:");
+<<<<<<< Updated upstream
         foreach (var pair in reg_lookup) {
             int data = pair.Value.GetValue();
             Console.WriteLine($"     {pair.Key}: {ToHex(data)} ({data})");
+=======
+        for (int i = 0; i < registers.Count; i++) {
+            Reg r = registers[i];
+            Console.WriteLine($"    {r.name}: {r.lo}");
+>>>>>>> Stashed changes
         }
     }   	
 }
