@@ -126,7 +126,10 @@ public class mc_86 {
     
     public static int ToInt16(byte lo, byte hi) 
     {
-        return BitConverter.ToInt16(new byte[] { lo, hi });
+        int result;
+        if (BitConverter.IsLittleEndian) result = BitConverter.ToInt16(new byte[] { lo, hi });
+        else result = BitConverter.ToInt16(new byte[] { hi, lo});
+        return result;
     }
 
     private static byte NextByte() 
@@ -266,7 +269,7 @@ public class mc_86 {
 
         if (reg == null) {
             reg = new Reg("null");
-            Console.WriteLine($"WARNING: null reg, wanted {location}, memMode: {memMode}"); 
+            debug($"WARNING: null reg, wanted {location}, memMode: {memMode}"); 
         }
         else reg.name = location;
         return reg;
@@ -475,106 +478,81 @@ public class mc_86 {
                 // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
                 debug("s: " + d);
                 bool s = d;
-                bool handled = true;
                 if (s || !w) debug("(s or !w), might be problematic");
                 if (reg == 0b000) info.transfer = "add";
                 else if (reg == 0b101) info.transfer = "sub";
                 else if (reg == 0b111) info.transfer = "cmp";
                 else 
                 {
-                    handled = false;
-                    Console.WriteLine($"unhandled 6bit code({info.code})with reg({reg})");
+                    Console.WriteLine($"ERROR: unhandled 6bit code({info.code})with reg({reg})");
                 }
-                if (handled) {
-                    // from table 4-13 just listing out the possibilities...
-                    // 00 reg8, imm8
-                    // 01 reg16, imm16
-                    // 10 reg8, imm8
-                    // 11 reg16, imm8
-                    // so if w is 0, both are small
-                    // manual had  "if s: w=01"
-                    // manual had  "if s: w=1" for CMP, which is confusing
-                    if (!s && w) 
-                    {
-                        byte lo = NextByte();
-                        byte hi = NextByte();
-                        int data = ToInt16(lo, hi);
-                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                    }
-                    else 
-                    {
-                        int data = NextByte(); 
-                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                    }
+                // from table 4-13 just listing out the possibilities...
+                // 00 reg8, imm8
+                // 01 reg16, imm16
+                // 10 reg8, imm8
+                // 11 reg16, imm8
+                // so if w is 0, both are small
+                // manual had  "if s: w=01"
+                // manual had  "if s: w=1" for CMP, which is confusing
+                if (!s && w) 
+                {
+                    byte lo = NextByte();
+                    byte hi = NextByte();
+                    int data = ToInt16(lo, hi);
+                    Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
                 }
-                else {
-                    // no! #TODO this is where non-handled arrives!
-                    // add/sub/cmp rm rm
-                    debug("d: " + d);
-                    debug("i guess we're here?");
-                    Reg? dest;
-                    Reg? src;
-                    if (d) 
-                    {
-                        dest = GetRegister(false, ids.reg, w);
-                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                    }
-                    else 
-                    {
-                        src = GetRegister(false, ids.reg, w);
-                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                    }
-                    switch (info.transfer) 
-                    {
-                        case "cmp":
-                            Exec.CmpRmRm(dest, src, w);   
-                            break;
-                        case "sub":
-                            Exec.SubRmRm(dest, src, w);   
-                            break;
-                        case "add":
-                            Exec.AddRmRm(dest, src, w);   
-                            break;
-                        default:
-                            Console.WriteLine("unhandled transfer: " + info.transfer);
-                            break;
-                   }
-
-
-                    if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                    else {
-                        debug("i guess we're actually here?");
-                        Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
-                    }    
+                else 
+                {
+                    int data = NextByte(); 
+                    Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
                 }
             }
-            else 
-            {
-                // no! #TODO this is where 6b codes that aren't imm_sub,cmp,add, mov? goes!
-                // mov_rm_rm only i think
-                System.Diagnostics.Debug.Assert(info.code == Op.mov_rm_rm);
-                Reg src;
-                Reg dest;
+            else { 
+                // this is where 6b codes that aren't imm_x goes!
+                // i assume it's all xx_rm_rm
+                // we have parsed mod reg rm
+                debug("d: " + d);
+                debug("i guess we're here?");
+                Reg dest = new Reg("unsetDest");
+                Reg src = new Reg("unsetSrc");
                 if (d) 
                 {
-                    Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                    if (!ids.memMode) 
-                    {
-                        dest = GetRegister(false, ids.reg, w);
-                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                        Exec.MoveRmRm(dest, src, w);
-                    }
+                    dest = GetRegister(false, ids.reg, w);
+                    src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
                 }
-                else
+                else 
                 {
-                    if (!ids.memMode) 
-                    {
-                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                        src = GetRegister(false, ids.reg, w);
-                        Exec.MoveRmRm(dest, src, w);
-                    }
-                    else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                    src = GetRegister(false, ids.reg, w);
+                    dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
                 }
+
+                switch (info.transfer) 
+                {
+                    case "mov":
+                        if (ids.memMode) 
+                        {
+                            // this is cumbersome, bc GetRegister doesn't handle effective addresses well
+                            if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
+                            else {
+                                debug("i guess we're actually here?");
+                                Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
+                            }    
+                        }
+                        else Exec.MovRmRm(dest, src, w);
+                        break;
+                    case "cmp":
+                        Exec.CmpRmRm(dest, src, w);   
+                        break;
+                    case "sub":
+                        Exec.SubRmRm(dest, src, w);   
+                        break;
+                    case "add":
+                        Exec.AddRmRm(dest, src, w);   
+                        break;
+                    default:
+                        Console.WriteLine($"ERROR: unhandled transfer, {info.transfer}");
+                        break;
+               }
             }
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
@@ -608,8 +586,6 @@ public class mc_86 {
 
     public static string GetFlags() 
     {
-        // #TEMP
-        mc_86.flags = 0b11111111;
         string flagPrint = "";
         if ((mc_86.flags & 0b10) != 0) flagPrint += "S";
         if ((mc_86.flags & 0b1) != 0) flagPrint += "Z";
