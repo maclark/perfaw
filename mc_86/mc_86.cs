@@ -4,11 +4,13 @@ using System.IO;
 public class mc_86 {
 
     public class Reg {
+        public string baseName;
         public string name;
         public byte hi;
         public byte lo;
         public Reg(string name) 
         {
+            this.baseName = name;
             this.name = name;
             hi = 0;
             lo = 0;
@@ -139,78 +141,134 @@ public class mc_86 {
         return b;
     }
 
-    public static string ToHex(int h) { 
-        byte[] bytes = (byte[])BitConverter.GetBytes(h);
-        Array.Reverse(bytes);
-        string s = BitConverter.ToString(bytes).Replace("-","").TrimStart('0');
-        if (string.IsNullOrEmpty(s)) s = "0";
-        return $"0x{s}"; 
+    public static string ToHex(int h, bool pad=false) { 
+        uint uh = (uint)h;
+        if (pad) return "0x" + h.ToString("X4");
+        else return "0x" + h.ToString("X");
     }
 
 	public static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
 	public static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
 	public static Reg GetRegister(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
-		string regName = "unknown";
+		string location = "unknown";
+        Reg? reg = null;
 		switch (regNum) {
 			case 0b000:
-				if (memMode) regName = "bx + si";
-				else if (w) regName = "ax";
-				else regName = "al";
-				break;
+				if (memMode) location = "bx + si";
+				else if (w) {
+                    reg = registers[0];
+                    location = "ax";
+                }
+                else {
+                    reg = registers[0];
+                    location = "al";
+				}
+                break;
 			case 0b001:
-				if (memMode) regName = "bx + di";
-				else if (w) regName ="cx";
-				else regName ="cl";
+				if (memMode) location = "bx + di";
+				else if (w) {
+                    reg = registers[2];
+                    location ="cx";
+                }
+				else {
+                    reg = registers[2];
+                    location ="cl";
+                }
 				break;
 			case 0b010:
-				if (memMode) regName = "bp + si";
-				else if (w) regName ="dx";
-				else regName ="dl";
+				if (memMode) location = "bp + si";
+				else if (w) {
+                    reg = registers[3];
+                    location ="dx";
+                }
+				else {
+                    reg = registers[3];
+                    location ="dl";
+                }
 				break;
 			case 0b011:
-				if (memMode) regName = "bp + di";
-				else if (w) regName ="bx";
-				else regName ="bl";
+				if (memMode) location = "bp + di";
+				else if (w) {
+                    reg = registers[1];
+                    location ="bx";
+                }
+				else {
+                    reg = registers[1];
+                    location ="bl";
+                }
 				break;
 			case 0b100:
-				if (memMode) regName = "si";
-				else if (w) regName ="sp";
-				else regName ="ah";
+				if (memMode) {
+                    reg = registers[6];
+                    location = "si";
+                }
+				else if (w) {
+                    reg = registers[4];
+                    location ="sp";
+                }
+				else {
+                    reg = registers[0];
+                    location ="ah";
+                }
 				break;
 			case 0b101:
-				if (memMode) regName = "di";
-				else if (w) regName ="bp";
-				else regName ="ch";
+				if (memMode) {
+                    reg = registers[7];
+                    location = "di";
+                }
+				else if (w) {
+                    reg = registers[5];
+                    location ="bp";
+                }
+				else {
+                    reg = registers[2];
+                    location ="ch";
+                }
 				break;
 			case 0b110:
 				if (memMode) {
-                    if (mod != 0) regName = "bp";
+                    if (mod != 0) {
+                        reg = registers[5];
+                        location = "bp";
+                    }
                     else {
-                        regName = "";
+                        location = "";
                         if (disp.Length > 3) disp = disp.Substring(3);
                     }
                 }
-				else if (w) regName ="si";
-				else regName ="dh";
+				else if (w) {
+                    reg = registers[6];
+                    location ="si";
+				}
+                else {
+                    reg = registers[3];
+                    location ="dh";
+                }
 				break;
 			case 0b111:
-				if (memMode) regName = "bx";
-				else if (w) regName = "di";
-                else regName ="bh";
+                // what, bx is memory mode?
+				if (memMode) location = "bx";
+				else if (w) {
+                    reg = registers[7];
+                    location = "di";
+                }
+                else {
+                    reg = registers[1];
+                    location ="bh";
+                }
 				break;
 			default:
 				Console.WriteLine($"unhandled register number: {Convert.ToString(regNum, 2)}");
 				break;
 		}
 
-        if (memMode) Console.WriteLine("WARNING: we're supposed to get a register, but we're in memory mode?");
-        
-        Reg? reg = registers.Find(r => r.name == regName);
-        if (reg == null) return new Reg("blank");
-        else return reg;
-		//if (memMode) return $"[{regName}{disp}]";
-		//else return regName;
+        if (reg == null) {
+            reg = new Reg("null");
+            Console.WriteLine($"WARNING: null reg, wanted {location}, memMode: {memMode}"); 
+        }
+        else reg.name = location;
+        return reg;
 	}
 
 
@@ -459,32 +517,41 @@ public class mc_86 {
                     }    
                 }
             }
-            
+
+            // i don't think i should reach here if the op was add/sub/cmp
+            // should probably have an 'else'
             Reg src;
             Reg dest;
             if (d) 
             {
                 Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                dest = GetRegister(false, ids.reg, w);
-                src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                if (!ids.memMode) 
+                {
+                    dest = GetRegister(false, ids.reg, w);
+                    src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    Exec.MoveRmRm(dest, src, w);
+                }
             }
             else
             {
-                Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
-                dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                src = GetRegister(false, ids.reg, w);
+                if (!ids.memMode) 
+                {
+                    dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    src = GetRegister(false, ids.reg, w);
+                    Exec.MoveRmRm(dest, src, w);
+                }
+                else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
             }
-            Exec.MoveRmRm(dest, src, w);
-            
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
-            debug("(4b)found op: " + info.code + ", " + info.transfer);
-            // i believe the only 4b op code we have is imm_reg
+            debug("(4bit)found op: " + info.code + ", " + info.transfer);
+            // i believe the only 4b op code we have is mov_imm_reg
+            if (info.code != Op.mov_imm_reg) Console.WriteLine("WARNING: unhandled op");
             bool w = (byte1 & 0b00001000) != 0;
             int regNum = byte1 & 0b00000111;
-            //string regName = GetReg(false, regNum, w);
-            Reg reg = GetRegister(false, regNum, w);
+            debug("regNum " + ToBinary(regNum));
             debug("w: " + w);
+            Reg reg = GetRegister(false, regNum, w);
             if (w) 
             {
                 string cached = ToHex(ToInt16(reg.lo, reg.hi));
@@ -542,7 +609,8 @@ public class mc_86 {
         Console.WriteLine("\nFinal registers:");
         for (int i = 0; i < registers.Count; i++) {
             Reg r = registers[i];
-            Console.WriteLine($"    {r.name}: {r.lo}");
+            int data = ToInt16(r.lo, r.hi);
+            Console.WriteLine($"    {r.baseName}: {ToHex(data, true)} ({data})");
         }
     }   	
 }
