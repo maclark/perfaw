@@ -3,14 +3,35 @@ using System;
 
 public static class Exec {
 
-    public static void MoveRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) {
-        mc_86.debug("here we are now");
-        string cached = mc_86.ToHex(mc_86.ToInt16(dest.lo, dest.hi));
+    public static byte[] GetBytes(int i)
+    {
+        byte[] b = BitConverter.GetBytes(i);
+        if (!BitConverter.IsLittleEndian) Array.Reverse(b);
+        return b;
+    }
+
+    public static string GetHex(mc_86.Reg reg) {
+        return mc_86.ToHex(GetInt(reg));
+    }
+
+    public static int GetInt(mc_86.Reg reg) 
+    {
+        return mc_86.ToInt16(reg.lo, reg.hi);
+    }
+
+    public static void PrintResult(string op, string cached, mc_86.Reg dest, mc_86.Reg src)
+    {
+        string result = GetHex(dest);
+        Console.WriteLine($"{op} {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {mc_86.GetFlags()}");
+    }
+
+    public static void MovRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) {
+        mc_86.debug("executing MovRmRm");
+        string cached = GetHex(dest); 
         if (w) // i'm assuming this is how we know to use 1 or 2 bytes 
         {
             dest.hi = src.hi;
             dest.lo = src.lo;
-            // idk if we're supposed to empty out src?
         }
         else 
         {
@@ -18,42 +39,60 @@ public static class Exec {
             dest.hi = 0;
             dest.lo = src.lo;
         }
-        mc_86.debug("w: " + w);
-        mc_86.debug(src.name + " src had " + src.lo);
-        mc_86.debug(dest.name + " now has " + dest.lo);
-
-        string movedData = mc_86.ToHex(mc_86.ToInt16(dest.lo, dest.hi)); 
-        Console.WriteLine($"mov {dest.name}, {src.name} ; {dest.name}:{cached}->{movedData} {mc_86.GetFlags()}");
+        PrintResult("mov", cached, dest, src);
     } 
 
     public static void AddRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
     {
-        Console.WriteLine("unhandled add");
+        string cached = GetHex(dest); 
+        if (w) 
+        {
+           int dData = GetInt(dest);
+           int sData = GetInt(src);
+           int result = dData + sData;
+           byte[] bytes = GetBytes(result); 
+           dest.lo = bytes[0];
+           dest.hi = bytes[1];
+        }
+        else 
+        {
+            // do we discard the destination's high byets? idk
+            Console.WriteLine("WARNING: do we discard dest high bytes?");
+            dest.lo += src.lo;
+        }
+        // #TODO
+        //if (dest.hi == 0b0 && dest.lo == 0b0) mc_86.SetFlag(mc_86.flags.Z);
+        PrintResult("mov", cached, dest, src);
     }
 
     public static void CmpRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
     {
         Console.WriteLine("unhandled cmp");
+        string cached = GetHex(dest);
+
+        PrintResult("cmp", cached, dest, src);
     }
 
     public static void SubRmRm(mc_86.Reg dest, mc_86.Reg src, bool w)
     {
         mc_86.debug("subtraction!");
-        string cached = mc_86.ToHex(mc_86.ToInt16(dest.lo, dest.hi));
-        int result = 0;
+        string cached = GetHex(dest);
         if (w) 
         {
             int dData = mc_86.ToInt16(dest.lo, dest.hi);
             int sData = mc_86.ToInt16(dest.lo, dest.hi);
-            result = dData - sData;
-            mc_86.debug("w sub result: " + result);
+            int result = dData - sData;
+            byte[] bytes = GetBytes(result);
+            dest.hi = bytes[0];
+            dest.lo = bytes[1];
         }
         else 
         {
-            result = dest.lo - src.lo;
-            dest.lo = (byte)result;
+            if (dest.hi != 0) Console.WriteLine("WARNING: non zero high bytes being dropped?");
+            dest.hi = 0;
+            dest.lo = (byte)(dest.lo - src.lo);
         }
-        Console.WriteLine($"mov {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {mc_86.GetFlags()}");
+        PrintResult("sub", cached, dest, src);
     }
 }
 
