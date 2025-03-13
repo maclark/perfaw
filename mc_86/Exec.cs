@@ -23,6 +23,37 @@ public static class Exec {
         mc_86.debug(dest.name + " now has " + dest.lo);
 
         string movedData = mc_86.ToHex(mc_86.ToInt16(dest.lo, dest.hi)); 
-        Console.WriteLine($"mov {dest.name}, {src.name} ; {dest.name}:{cached}->{movedData}");
+        Console.WriteLine($"mov {dest.name}, {src.name} ; {dest.name}:{cached}->{movedData} {mc_86.GetFlags()}");
     } 
+
+    public static void AddRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
+    {
+        Console.WriteLine("unhandled add");
+    }
+
+    public static void CmpRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
+    {
+        Console.WriteLine("unhandled cmp");
+    }
+
+    public static void SubRmRm(mc_86.Reg dest, mc_86.Reg src, bool w)
+    {
+        mc_86.debug("subtraction!");
+        string cached = mc_86.ToHex(mc_86.ToInt16(dest.lo, dest.hi));
+        int result = 0;
+        if (w) 
+        {
+            int dData = mc_86.ToInt16(dest.lo, dest.hi);
+            int sData = mc_86.ToInt16(dest.lo, dest.hi);
+            result = dData - sData;
+            mc_86.debug("w sub result: " + result);
+        }
+        else 
+        {
+            result = dest.lo - src.lo;
+            dest.lo = (byte)result;
+        }
+        Console.WriteLine($"mov {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {mc_86.GetFlags()}");
+    }
 }
+

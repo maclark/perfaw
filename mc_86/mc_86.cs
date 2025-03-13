@@ -117,7 +117,8 @@ public class mc_86 {
     public static Dictionary<int, OpInfo> op_codes_4b = new Dictionary<int, OpInfo>() {
         {0b1011, new OpInfo(Op.mov_imm_reg, "mov")},
     };
-	
+
+    public static byte flags = 0;
     private static bool debugPrints = false;
 	private static byte[] content = new byte[0];
 	private static int index = 0;
@@ -507,9 +508,39 @@ public class mc_86 {
                     }
                 }
                 else {
-                    // mov/add/sub/cmp rm rm
+                    // no! #TODO this is where non-handled arrives!
+                    // add/sub/cmp rm rm
                     debug("d: " + d);
                     debug("i guess we're here?");
+                    Reg? dest;
+                    Reg? src;
+                    if (d) 
+                    {
+                        dest = GetRegister(false, ids.reg, w);
+                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    }
+                    else 
+                    {
+                        src = GetRegister(false, ids.reg, w);
+                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    }
+                    switch (info.transfer) 
+                    {
+                        case "cmp":
+                            Exec.CmpRmRm(dest, src, w);   
+                            break;
+                        case "sub":
+                            Exec.SubRmRm(dest, src, w);   
+                            break;
+                        case "add":
+                            Exec.AddRmRm(dest, src, w);   
+                            break;
+                        default:
+                            Console.WriteLine("unhandled transfer: " + info.transfer);
+                            break;
+                   }
+
+
                     if (d) Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
                     else {
                         debug("i guess we're actually here?");
@@ -517,30 +548,33 @@ public class mc_86 {
                     }    
                 }
             }
-
-            // i don't think i should reach here if the op was add/sub/cmp
-            // should probably have an 'else'
-            Reg src;
-            Reg dest;
-            if (d) 
+            else 
             {
-                Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
-                if (!ids.memMode) 
+                // no! #TODO this is where 6b codes that aren't imm_sub,cmp,add, mov? goes!
+                // mov_rm_rm only i think
+                System.Diagnostics.Debug.Assert(info.code == Op.mov_rm_rm);
+                Reg src;
+                Reg dest;
+                if (d) 
                 {
-                    dest = GetRegister(false, ids.reg, w);
-                    src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                    Exec.MoveRmRm(dest, src, w);
+                    Console.WriteLine($"{info.transfer} {GetReg(false, ids.reg, w)}, {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}");
+                    if (!ids.memMode) 
+                    {
+                        dest = GetRegister(false, ids.reg, w);
+                        src = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                        Exec.MoveRmRm(dest, src, w);
+                    }
                 }
-            }
-            else
-            {
-                if (!ids.memMode) 
+                else
                 {
-                    dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
-                    src = GetRegister(false, ids.reg, w);
-                    Exec.MoveRmRm(dest, src, w);
+                    if (!ids.memMode) 
+                    {
+                        dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                        src = GetRegister(false, ids.reg, w);
+                        Exec.MoveRmRm(dest, src, w);
+                    }
+                    else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
                 }
-                else Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {GetReg(false, ids.reg, w)}");
             }
         }       
         else if (op_codes_4b.TryGetValue(b4, out info)) {
@@ -571,6 +605,16 @@ public class mc_86 {
         }
         else Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
 	}
+
+    public static string GetFlags() 
+    {
+        // #TEMP
+        mc_86.flags = 0b11111111;
+        string flagPrint = "";
+        if ((mc_86.flags & 0b10) != 0) flagPrint += "S";
+        if ((mc_86.flags & 0b1) != 0) flagPrint += "Z";
+        return flagPrint;
+    }
 
 	public static void Main(string[] args) {
         string filePath = "";
