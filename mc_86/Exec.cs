@@ -1,5 +1,5 @@
 using System;
-//using mc_86 = mc;
+using M = mc_86;
 
 public static class Exec {
 
@@ -10,23 +10,27 @@ public static class Exec {
         return b;
     }
 
-    public static string GetHex(mc_86.Reg reg) {
-        return mc_86.ToHex(GetInt(reg));
+    public static string GetHex(M.Reg reg) {
+        return M.ToHex(GetInt(reg));
     }
 
-    public static int GetInt(mc_86.Reg reg) 
+    public static int GetInt(M.Reg reg) 
     {
-        return mc_86.ToInt16(reg.lo, reg.hi);
+        return M.ToInt16(reg.lo, reg.hi);
     }
 
-    public static void PrintResult(string op, string cached, mc_86.Reg dest, mc_86.Reg src)
+    public static void PrintResult(string op, string cached, M.Reg dest, M.Reg src)
     {
         string result = GetHex(dest);
-        Console.WriteLine($"{op} {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {mc_86.GetFlags()}");
+        if (string.IsNullOrEmpty(cached)) 
+        {
+            Console.WriteLine($"{op} {dest.name}, {src.name} ; {M.GetFlags()}");
+        }
+        else Console.WriteLine($"{op} {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {M.GetFlags()}");
     }
 
-    public static void MovRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) {
-        mc_86.debug("executing MovRmRm");
+    public static void MovRmRm(M.Reg dest, M.Reg src, bool w) {
+        M.debug("executing MovRmRm");
         string cached = GetHex(dest); 
         if (w) // i'm assuming this is how we know to use 1 or 2 bytes 
         {
@@ -42,7 +46,7 @@ public static class Exec {
         PrintResult("mov", cached, dest, src);
     } 
 
-    public static void AddRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
+    public static void AddRmRm(M.Reg dest, M.Reg src, bool w) 
     {
         string cached = GetHex(dest); 
         if (w) 
@@ -61,26 +65,34 @@ public static class Exec {
             dest.lo += src.lo;
         }
         // #TODO
-        //if (dest.hi == 0b0 && dest.lo == 0b0) mc_86.SetFlag(mc_86.flags.Z);
+        //if (dest.hi == 0b0 && dest.lo == 0b0) M.SetFlag(M.flags.Z);
         PrintResult("mov", cached, dest, src);
     }
 
-    public static void CmpRmRm(mc_86.Reg dest, mc_86.Reg src, bool w) 
+    public static void CmpRmRm(M.Reg dest, M.Reg src, bool w) 
     {
-        Console.WriteLine("unhandled cmp");
-        string cached = GetHex(dest);
-
-        PrintResult("cmp", cached, dest, src);
+        if (!w)
+        {
+            Console.WriteLine("comparing just lo bits happens?");    
+            if (src.lo < dest.lo) M.SetFlag(M.RegFlag.Sign);
+            else M.UnsetFlag(M.RegFlag.Sign);
+        }
+        else 
+        {
+            if (GetInt(src) < GetInt(dest)) M.SetFlag(M.RegFlag.Sign);
+            else M.UnsetFlag(M.RegFlag.Sign);
+        }
+        PrintResult("cmp", "", dest, src);
     }
 
-    public static void SubRmRm(mc_86.Reg dest, mc_86.Reg src, bool w)
+    public static void SubRmRm(M.Reg dest, M.Reg src, bool w)
     {
-        mc_86.debug("subtraction!");
+        M.debug("subtraction!");
         string cached = GetHex(dest);
         if (w) 
         {
-            int dData = mc_86.ToInt16(dest.lo, dest.hi);
-            int sData = mc_86.ToInt16(dest.lo, dest.hi);
+            int dData = M.ToInt16(dest.lo, dest.hi);
+            int sData = M.ToInt16(dest.lo, dest.hi);
             int result = dData - sData;
             byte[] bytes = GetBytes(result);
             dest.hi = bytes[0];

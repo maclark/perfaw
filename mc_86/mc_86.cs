@@ -118,7 +118,8 @@ public class mc_86 {
         {0b1011, new OpInfo(Op.mov_imm_reg, "mov")},
     };
 
-    public static byte flags = 0;
+    //public static byte flags = 0;
+    public static RegFlag flags = RegFlag.None;
     private static bool debugPrints = false;
 	private static byte[] content = new byte[0];
 	private static int index = 0;
@@ -584,11 +585,29 @@ public class mc_86 {
         else Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
 	}
 
+    [Flags]
+    public enum RegFlag : byte
+    {
+        None = 0,
+        Zero = 1 << 0, // 0b1,
+        Sign = 1 << 1, //0b10,
+    }
+
+    public static void SetFlag(RegFlag f) 
+    {
+        flags |= f;
+    }
+
+    public static void UnsetFlag(RegFlag f) 
+    {
+        flags &= ~f;
+    }
+
     public static string GetFlags() 
     {
         string flagPrint = "";
-        if ((mc_86.flags & 0b10) != 0) flagPrint += "S";
-        if ((mc_86.flags & 0b1) != 0) flagPrint += "Z";
+        if ((mc_86.flags & RegFlag.Sign) != 0) flagPrint += "S";
+        if ((mc_86.flags & RegFlag.Zero) != 0) flagPrint += "Z";
         return flagPrint;
     }
 
