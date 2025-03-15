@@ -16,17 +16,30 @@ public static class Exec {
 
     public static int GetInt(M.Reg reg) 
     {
-        return M.ToInt16(reg.lo, reg.hi);
+        return GetInt(reg.lo, reg.hi);
     }
 
-    public static void PrintResult(string op, string cached, M.Reg dest, M.Reg src)
+    public static int GetInt(byte lo, byte hi)
     {
-        string result = GetHex(dest);
-        if (string.IsNullOrEmpty(cached)) 
-        {
-            Console.WriteLine($"{op} {dest.name}, {src.name} ; {M.GetFlags()}");
-        }
-        else Console.WriteLine($"{op} {dest.name}, {src.name} ; {dest.name}:{cached}->{result} {M.GetFlags()}");
+        return M.ToInt16(lo, hi);
+    }
+
+    public static void PrintResult(string op, string cached, string destLoc, string srcLoc, string destResult, bool printFlags=false)
+    {
+        string line = $"{op} {destLoc}, {srcLoc} ;";
+        if (!string.IsNullOrEmpty(cached)) line += $" {destLoc}:{cached}->{destResult}";
+        if (printFlags) line += $" flags:->{M.GetFlags()}"; 
+        Console.WriteLine(line);
+    }
+
+    public static void MovImm(M.Reg dest, byte lo, byte hi)
+    {
+        M.debug("executing MovImm");
+        string cached = GetHex(dest);
+        dest.hi = hi;
+        dest.lo = lo;
+        string destResult = GetInt(lo, hi).ToString();
+        PrintResult("mov", cached, dest.name, destResult, GetHex(dest));
     }
 
     public static void MovRmRm(M.Reg dest, M.Reg src, bool w) {
@@ -43,16 +56,22 @@ public static class Exec {
             dest.hi = 0;
             dest.lo = src.lo;
         }
-        PrintResult("mov", cached, dest, src);
+        PrintResult("mov", cached, dest.name, src.name, GetHex(dest));
     } 
 
     public static void AddRmRm(M.Reg dest, M.Reg src, bool w) 
     {
+        Add(dest, src.name, src.lo, src.hi, w);
+    }
+
+    public static void Add(M.Reg dest, string srcLoc, byte lo, byte hi, bool w)
+    {
+        if (string.IsNullOrEmpty(srcLoc)) srcLoc = GetInt(lo, hi).ToString();
         string cached = GetHex(dest); 
         if (w) 
         {
            int dData = GetInt(dest);
-           int sData = GetInt(src);
+           int sData = GetInt(lo, hi);
            int result = dData + sData;
            byte[] bytes = GetBytes(result); 
            dest.lo = bytes[0];
@@ -62,49 +81,75 @@ public static class Exec {
         {
             // do we discard the destination's high byets? idk
             Console.WriteLine("WARNING: do we discard dest high bytes?");
-            dest.lo += src.lo;
+            dest.lo += lo;
         }
-        // #TODO
-        //if (dest.hi == 0b0 && dest.lo == 0b0) M.SetFlag(M.flags.Z);
-        PrintResult("mov", cached, dest, src);
+        PrintResult("mov", cached, dest.name, srcLoc, GetHex(dest));
     }
 
     public static void CmpRmRm(M.Reg dest, M.Reg src, bool w) 
     {
+        Cmp(dest, src.name, src.lo, src.hi, w);
+    }
+
+    public static void Cmp(M.Reg dest, string srcLoc, byte lo, byte hi, bool w)
+    {
+        if (string.IsNullOrEmpty(srcLoc)) srcLoc = GetInt(lo, hi).ToString();
         if (!w)
         {
             Console.WriteLine("comparing just lo bits happens?");    
-            if (src.lo < dest.lo) M.SetFlag(M.RegFlag.Sign);
+            if (lo < dest.lo) M.SetFlag(M.RegFlag.Sign);
             else M.UnsetFlag(M.RegFlag.Sign);
         }
         else 
         {
-            if (GetInt(src) < GetInt(dest)) M.SetFlag(M.RegFlag.Sign);
+            if (GetInt(lo, hi) < GetInt(dest)) M.SetFlag(M.RegFlag.Sign);
             else M.UnsetFlag(M.RegFlag.Sign);
         }
-        PrintResult("cmp", "", dest, src);
+        PrintResult("cmp", "", dest.name, srcLoc, "", true);
     }
 
     public static void SubRmRm(M.Reg dest, M.Reg src, bool w)
     {
-        M.debug("subtraction!");
+        M.debug("subtraction rm rm!");
+        Sub(dest, src.name, src.lo, src.hi, w);
+    }
+
+    public static void Sub(M.Reg dest, string srcLoc, byte lo, byte hi, bool w)
+    {
+        if (string.IsNullOrEmpty(srcLoc)) srcLoc = GetInt(lo, hi).ToString();
         string cached = GetHex(dest);
+        int result = 0;
+        bool signed;
         if (w) 
         {
             int dData = M.ToInt16(dest.lo, dest.hi);
-            int sData = M.ToInt16(dest.lo, dest.hi);
-            int result = dData - sData;
+            int sData = M.ToInt16(lo, hi);
+            result = dData - sData;
             byte[] bytes = GetBytes(result);
-            dest.hi = bytes[0];
-            dest.lo = bytes[1];
+            dest.lo = bytes[0];
+            dest.hi = bytes[1];
+            signed = (dest.hi & (1 << 7)) != 0;
         }
         else 
         {
             if (dest.hi != 0) Console.WriteLine("WARNING: non zero high bytes being dropped?");
             dest.hi = 0;
-            dest.lo = (byte)(dest.lo - src.lo);
+            dest.lo = (byte)(dest.lo - lo);
+            result = dest.lo;
+            signed = (dest.lo & (1 << 7)) != 0;
         }
-        PrintResult("sub", cached, dest, src);
+        if (result == 0) 
+        {
+            M.SetFlag(M.RegFlag.Zero);
+            M.UnsetFlag(M.RegFlag.Sign);
+        }
+        else 
+        {
+            M.UnsetFlag(M.RegFlag.Zero);
+            if (signed) M.SetFlag(M.RegFlag.Sign);
+            else M.UnsetFlag(M.RegFlag.Sign);
+        }
+        PrintResult("sub", cached, dest.name, srcLoc, GetHex(dest), true);
     }
 }
 

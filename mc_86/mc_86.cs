@@ -127,9 +127,9 @@ public class mc_86 {
     
     public static int ToInt16(byte lo, byte hi) 
     {
-        int result;
-        if (BitConverter.IsLittleEndian) result = BitConverter.ToInt16(new byte[] { lo, hi });
-        else result = BitConverter.ToInt16(new byte[] { hi, lo});
+        ushort result;
+        if (BitConverter.IsLittleEndian) result = BitConverter.ToUInt16(new byte[] { lo, hi });
+        else result = BitConverter.ToUInt16(new byte[] { hi, lo});
         return result;
     }
 
@@ -477,16 +477,6 @@ public class mc_86 {
             if (info.code == Op.add_imm_rm) {
                 // this could be 1 of 3 actual ops
                 // and d is now s (1 is sign extend 8-bit to 16 if w is also 1)
-                debug("s: " + d);
-                bool s = d;
-                if (s || !w) debug("(s or !w), might be problematic");
-                if (reg == 0b000) info.transfer = "add";
-                else if (reg == 0b101) info.transfer = "sub";
-                else if (reg == 0b111) info.transfer = "cmp";
-                else 
-                {
-                    Console.WriteLine($"ERROR: unhandled 6bit code({info.code})with reg({reg})");
-                }
                 // from table 4-13 just listing out the possibilities...
                 // 00 reg8, imm8
                 // 01 reg16, imm16
@@ -495,18 +485,15 @@ public class mc_86 {
                 // so if w is 0, both are small
                 // manual had  "if s: w=01"
                 // manual had  "if s: w=1" for CMP, which is confusing
-                if (!s && w) 
-                {
-                    byte lo = NextByte();
-                    byte hi = NextByte();
-                    int data = ToInt16(lo, hi);
-                    Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                }
-                else 
-                {
-                    int data = NextByte(); 
-                    Console.WriteLine($"{info.transfer} {GetReg(ids.memMode, ids.rm, w, ids.mod, ids.disp)}, {data}");
-                }
+                debug("s: " + d);
+                bool s = d;
+                if (s || !w) debug("(s or !w), might be problematic");
+                bool wReal = !s && w;
+                Reg dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp); 
+                if (reg == 0b000) Exec.Add(dest, "", NextByte(), NextByte(), wReal);
+                else if (reg == 0b101) Exec.Sub(dest, "", NextByte(), NextByte(), wReal);
+                else if (reg == 0b111) Exec.Cmp(dest, "", NextByte(), NextByte(), wReal);
+                else Console.WriteLine($"ERROR: unhandled 6bit code({info.code})with reg({reg})");
             }
             else { 
                 // this is where 6b codes that aren't imm_x goes!
@@ -565,22 +552,8 @@ public class mc_86 {
             debug("regNum " + ToBinary(regNum));
             debug("w: " + w);
             Reg reg = GetRegister(false, regNum, w);
-            if (w) 
-            {
-                string cached = ToHex(ToInt16(reg.lo, reg.hi));
-                reg.lo = NextByte();
-                reg.hi = NextByte();
-                int data = ToInt16(reg.lo, reg.hi);
-                Console.WriteLine($"mov {reg.name}, {data} ; {reg.name}:{cached}->{ToHex(data)}");
-            }
-            else
-            {
-                debug("lower lower lower");
-                if (reg.hi != 0) Console.WriteLine("how do we handle printing out registers who had non zero hi bits and had their lo bits changed?");
-                string cached = ToHex(reg.lo);
-                reg.lo = NextByte();
-                Console.WriteLine($"mov {reg.name}, {reg.lo} ; {reg.name}:{cached}->{ToHex(reg.lo)}");
-            }
+            if (w) Exec.MovImm(reg, NextByte(), NextByte()); 
+            else Exec.MovImm(reg, NextByte(), 0);
         }
         else Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
 	}
@@ -648,8 +621,9 @@ public class mc_86 {
         Console.WriteLine("\nFinal registers:");
         for (int i = 0; i < registers.Count; i++) {
             Reg r = registers[i];
-            int data = ToInt16(r.lo, r.hi);
-            Console.WriteLine($"    {r.baseName}: {ToHex(data, true)} ({data})");
+            int data = ToInt16(r.lo, r.hi); 
+            if (data != 0) Console.WriteLine("{0,8}: {1} {2}", r.baseName, ToHex(data, true), $"({data})");
         }
+        Console.WriteLine("{0,8}: {1}", "flags", GetFlags());
     }   	
 }
