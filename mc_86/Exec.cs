@@ -28,6 +28,7 @@ public static class Exec {
     {
         string line = $"{op} {destLoc}, {srcLoc} ;";
         if (!string.IsNullOrEmpty(cached)) line += $" {destLoc}:{cached}->{destResult}";
+        line += " ip:" + M.ToHex(M.cachedIndex) + "->" + M.ToHex(M.index);
         if (printFlags) line += $" flags:->{M.GetFlags()}"; 
         Console.WriteLine(line);
     }
@@ -68,22 +69,16 @@ public static class Exec {
     {
         if (string.IsNullOrEmpty(srcLoc)) srcLoc = GetInt(lo, hi).ToString();
         string cached = GetHex(dest); 
-        if (w) 
-        {
-           int dData = GetInt(dest);
-           int sData = GetInt(lo, hi);
-           int result = dData + sData;
-           byte[] bytes = GetBytes(result); 
-           dest.lo = bytes[0];
-           dest.hi = bytes[1];
-        }
-        else 
-        {
-            // do we discard the destination's high byets? idk
-            Console.WriteLine("WARNING: do we discard dest high bytes?");
-            dest.lo += lo;
-        }
-        PrintResult("mov", cached, dest.name, srcLoc, GetHex(dest));
+        int dData = GetInt(dest);
+        int sData = GetInt(lo, w ? hi : (byte)0);
+        int result = dData + sData;
+        byte[] bytes = GetBytes(result); 
+        dest.lo = bytes[0];
+        dest.hi = bytes[1];
+        // do we discard the destination's high bytes? no
+        M.debug("lo is: " + lo);
+        M.debug("dest.lo is: " + dest.lo);
+        PrintResult("add", cached, dest.name, srcLoc, GetHex(dest));
     }
 
     public static void CmpRmRm(M.Reg dest, M.Reg src, bool w) 
@@ -150,6 +145,27 @@ public static class Exec {
             else M.UnsetFlag(M.RegFlag.Sign);
         }
         PrintResult("sub", cached, dest.name, srcLoc, GetHex(dest), true);
+    }
+
+    public static void JumpIf(M.Op op, sbyte jump)
+    {
+        if (jump > 125) Console.WriteLine("jump was greater than 125, so sbyte's gonna wrap");
+        jump += 2; 
+        switch (op) 
+        {
+            case  M.Op.jne:
+                if (!M.CheckFlag(M.RegFlag.Zero))
+                {
+                    M.index += jump - 2; // jumping 2 back also to compensate for the 2 bytes read for this operation
+                    Console.WriteLine($"jne ${jump} ; ip:{M.ToHex(M.cachedIndex)}->{M.ToHex(M.index)}");
+                }
+                else Console.WriteLine($"jne ${jump} ; ip:{M.ToHex(M.cachedIndex)}->{M.ToHex(M.index)}");
+                break;
+            default:
+                Console.WriteLine($"{op} {jump}");
+                Console.WriteLine("ERROR: unhandled jump: " + op.ToString());
+                break;
+        }
     }
 }
 

@@ -118,12 +118,14 @@ public class mc_86 {
         {0b1011, new OpInfo(Op.mov_imm_reg, "mov")},
     };
 
-    //public static byte flags = 0;
+	public static int index = 0;
+	public static int cachedIndex = 0;
+    
+    public static bool in_bounds = false;
     public static RegFlag flags = RegFlag.None;
+    
     private static bool debugPrints = false;
 	private static byte[] content = new byte[0];
-	private static int index = 0;
-    private static bool in_bounds = false;
     
     public static int ToInt16(byte lo, byte hi) 
     {
@@ -399,6 +401,8 @@ public class mc_86 {
     private static void Process() {
         // probably not necessary, i think we're going to print out the "WARNING" every time
         if (index >= content.Length) return;
+
+        cachedIndex = index; 
         byte byte1 = NextByte();
         debug("");
         int b7 = byte1 >> 1;
@@ -406,10 +410,8 @@ public class mc_86 {
         int b4 = byte1 >> 4;
         OpInfo info;
         if (op_codes_8b.TryGetValue(byte1, out info)) {
-            // conditional jumps, all have 8 bits following
-            debug("conditional jump");
-            sbyte spointer = (sbyte)NextByte();
-            Console.WriteLine($"{info.transfer} {spointer}");
+            // (8bit) conditional jumps
+            Exec.JumpIf(info.code, (sbyte)NextByte());
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
@@ -486,13 +488,16 @@ public class mc_86 {
                 // manual had  "if s: w=01"
                 // manual had  "if s: w=1" for CMP, which is confusing
                 debug("s: " + d);
+                debug("something immediate");
                 bool s = d;
                 if (s || !w) debug("(s or !w), might be problematic");
-                bool wReal = !s && w;
                 Reg dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp); 
-                if (reg == 0b000) Exec.Add(dest, "", NextByte(), NextByte(), wReal);
-                else if (reg == 0b101) Exec.Sub(dest, "", NextByte(), NextByte(), wReal);
-                else if (reg == 0b111) Exec.Cmp(dest, "", NextByte(), NextByte(), wReal);
+                bool wReal = !s && w;
+                byte b0 = NextByte();
+                byte b1 = wReal ? NextByte() : (byte)0;
+                if (reg == 0b000) Exec.Add(dest, "", b0, b1, wReal);
+                else if (reg == 0b101) Exec.Sub(dest, "", b0, b1, wReal);
+                else if (reg == 0b111) Exec.Cmp(dest, "", b0, b1, wReal);
                 else Console.WriteLine($"ERROR: unhandled 6bit code({info.code})with reg({reg})");
             }
             else { 
@@ -584,6 +589,11 @@ public class mc_86 {
         return flagPrint;
     }
 
+    public static bool CheckFlag(RegFlag f)
+    {
+        return (flags & f) != 0;
+    }
+
 	public static void Main(string[] args) {
         string filePath = "";
         for (int i = 0; i < args.Length; i++) {
@@ -607,8 +617,8 @@ public class mc_86 {
 		}
 
 		if (content.Length < 2) {
-        	 	Console.WriteLine("how many bytes are there? " + content.Length);
-	      		return;
+        	Console.WriteLine("how many bytes are there? " + content.Length);
+            return;
 		}
 		
 		Console.WriteLine($"processing file {filePath}");
@@ -624,6 +634,7 @@ public class mc_86 {
             int data = ToInt16(r.lo, r.hi); 
             if (data != 0) Console.WriteLine("{0,8}: {1} {2}", r.baseName, ToHex(data, true), $"({data})");
         }
+        Console.WriteLine("{0,8}: {1} {2}", "ip", ToHex(index, true), $"({index})");
         Console.WriteLine("{0,8}: {1}", "flags", GetFlags());
     }   	
 }
