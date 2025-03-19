@@ -589,9 +589,14 @@ public class mc_86 {
                 }
                 else 
                 {
-                    if (ids.memMode) Console.WriteLine("!d && memMode, unhandled?");
                     src = GetRegister(false, ids.reg, w);
-                    dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    if (ids.memMode)
+                    {
+                        GetMemory(ids, out address, out addDesc);
+                        address += ids.data;
+                        addDesc = $"[{addDesc}{ids.disp}]";
+                    }
+                    else dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
                 }
                 
                 switch (info.transfer) 
@@ -601,7 +606,7 @@ public class mc_86 {
                         {
                             Exec.MovRmMem(w, d, d ? dest : src, address, addDesc);
                         }
-                        else Exec.MovRmRm(dest, src, w);
+                        else Exec.MovRegReg(dest, src, w);
                         break;
                     case "cmp":
                         Exec.CmpRmRm(dest, src, w);   
@@ -696,6 +701,8 @@ public class mc_86 {
         index = 0;
         while (index < content.Length && in_bounds) {
             Process();
+            Console.WriteLine("press enter (or maybe any key) to continue...");
+            Console.ReadLine();
         }
 
         Console.WriteLine("\nFinal registers:");

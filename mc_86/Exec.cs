@@ -60,7 +60,6 @@ public static class Exec {
                 }
                 reg.hi = memory[address + 1]; // could be oob!
                 string result = GetHex(reg);
-                M.debug("now at address: " + address + " " + result);
                 Console.WriteLine($"mov {reg.name}, {addDesc} ; {reg.name}:{cached}->{result} {GetIp()}"); 
            }
            else 
@@ -74,6 +73,7 @@ public static class Exec {
                 }
                 memory[address + 1] = reg.hi; // could be oob!
                 string result = GetHex(reg);
+                M.debug("data now at address: " + address + " " + result);
                 Console.WriteLine($"mov {addDesc}, {reg.name} ; {GetIp()}"); 
            }
         }
@@ -92,6 +92,7 @@ public static class Exec {
                 memory[address] = reg.lo;
                 Console.WriteLine("we moved the lo byte to memory, do we zero out the full register?? won't result here give us a weird value, since its 16 bit?");
                 string result = GetHex(reg);
+                M.debug("data now at address: " + address + " " + result);
                 Console.WriteLine($"mov {addDesc}, {reg.name} ; {GetIp()}"); 
             }
         }
