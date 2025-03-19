@@ -3,6 +3,8 @@ using M = mc_86;
 
 public static class Exec {
 
+    public static byte[] memory = new byte[1024 * 1024];
+
     public static byte[] GetBytes(int i)
     {
         byte[] b = BitConverter.GetBytes(i);
@@ -28,8 +30,83 @@ public static class Exec {
     {
         string line = $"{op} {destLoc}, {srcLoc} ;";
         if (!string.IsNullOrEmpty(cached)) line += $" {destLoc}:{cached}->{destResult}";
-        line += " ip:" + M.ToHex(M.cachedIndex) + "->" + M.ToHex(M.index);
+        line += GetIp(); 
         if (printFlags) line += $" flags:->{M.GetFlags()}"; 
+        Console.WriteLine(line);
+    }
+
+    public static string GetIp() 
+    {
+        return " ip:" + M.ToHex(M.cachedIndex) + "->" + M.ToHex(M.index);
+    }
+
+    public static void MovRmMem(bool w, bool d, M.Reg reg, int address, string addDesc)
+    {
+        // moving a word from register to memory
+        // moving a word from memory to register
+        // moving a byte from register to memory
+        // moving a byte from memory to register
+        string cached = GetHex(reg);
+        if (w) 
+        {
+           if (d) 
+           {
+                // to a register
+                reg.lo = memory[address];
+                if (address == memory.Length - 1) 
+                {
+                    Console.WriteLine("oob address index: " + (address + 1)); 
+                    address = 0;
+                }
+                reg.hi = memory[address + 1]; // could be oob!
+                string result = GetHex(reg);
+                M.debug("now at address: " + address + " " + result);
+                Console.WriteLine($"mov {reg.name}, {addDesc} ; {reg.name}:{cached}->{result} {GetIp()}"); 
+           }
+           else 
+           {
+                // to memory from reg 
+                memory[address] = reg.lo;
+                if (address == memory.Length - 1) 
+                {
+                    Console.WriteLine("oob address index: " + (address + 1)); 
+                    address = 0;
+                }
+                memory[address + 1] = reg.hi; // could be oob!
+                string result = GetHex(reg);
+                Console.WriteLine($"mov {addDesc}, {reg.name} ; {GetIp()}"); 
+           }
+        }
+        else 
+        {
+            if (d) 
+            {
+                // to a register
+                reg.lo = memory[address];
+                string result = GetHex(reg);
+                Console.WriteLine($"mov {reg.name}, {addDesc} ; {reg.name}:{cached}->{result} {GetIp()}"); 
+            }
+            else
+            {
+                // to memory from reg
+                memory[address] = reg.lo;
+                Console.WriteLine("we moved the lo byte to memory, do we zero out the full register?? won't result here give us a weird value, since its 16 bit?");
+                string result = GetHex(reg);
+                Console.WriteLine($"mov {addDesc}, {reg.name} ; {GetIp()}"); 
+            }
+        }
+    }
+    
+    // we could be accessing a register
+    // a register + offset
+    // or direct address
+    public static void MovMemImm(bool w, int address, string addDesc, byte dataLo, byte dataHi)
+    {
+        string desc = w ? "word" : "byte";
+        int data = GetInt(dataLo, dataHi);
+        string line = $"mov {desc} {addDesc}, {data} ;{GetIp()}";   
+        memory[address] = dataLo;
+        if (w) memory[address + 1] = dataHi;
         Console.WriteLine(line);
     }
 
