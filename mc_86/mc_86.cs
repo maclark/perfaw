@@ -289,10 +289,8 @@ public class mc_86 {
         ids.mod = b >> 6;
         ids.reg = (b >> 3) & 0b111;
         ids.rm = b & 0b111;
-        debug("mod " + ToBinary(ids.mod));
-        debug("reg " + ToBinary(ids.reg));
-        debug("rm " + ToBinary(ids.rm));
         GetModeAndDisp(ref ids);
+        debug($"mod {ToBinary(ids.mod)}, reg {ToBinary(ids.reg)}, rm {ToBinary(ids.rm)}, memMod {ids.memMode}, disp {ids.disp}");
     }
 
     private static void GetModeAndDisp(ref Ids ids) {
@@ -302,7 +300,6 @@ public class mc_86 {
         // 11: register mode
         if (ids.mod == 0b00) {
             // check for r/m is 110
-            debug("00 mode");
             ids.memMode = true;
             if (ids.rm == 0b110) {
                 ids.b0 = NextByte();
@@ -312,14 +309,12 @@ public class mc_86 {
             }
         }	
         else if (ids.mod == 0b01) {
-            debug("01 mode");
             ids.memMode = true;
             ids.b0 = NextByte();
             ids.data = ids.b0;
             if (ids.b0 != 0) ids.disp = $"+{ids.b0}";
         }
         else if (ids.mod == 0b10) {
-            debug("10 mode");
             ids.memMode = true;
             ids.b0 = NextByte();
             ids.b1 = NextByte();
@@ -327,11 +322,9 @@ public class mc_86 {
             ids.disp = $"{(ids.data > 0 ? "+" : "-")}{Math.Abs(ids.data).ToString()}";
         }
         else if (ids.mod == 0b11) {
-            debug("11 mode");
             ids.memMode = false;
         }
         else Console.WriteLine($"error {ids.mod}");
-        debug("memoryMode: " + ids.memMode);
     }
 
     public class Ids {
@@ -351,7 +344,6 @@ public class mc_86 {
 
         cachedIndex = index; 
         byte byte1 = NextByte();
-        debug("");
         int b7 = byte1 >> 1;
         int b6 = byte1 >> 2;
         int b4 = byte1 >> 4;
@@ -362,9 +354,8 @@ public class mc_86 {
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
-            debug("(7b)found op: " + info.code + ", " + info.transfer);       
             bool w = (byte1 & 1) != 0;
-            debug("w: " + w);
+            debug($"(7bit)found op: {info.code}, w: {w}");       
             string acReg = w ? "ax" : "al"; // looks like 0b11 is ax imm, and 0b10 is al imm, nothing else in book
             if (info.code == Op.mov_mem_acc) {
                 byte byte2 = NextByte();
@@ -408,6 +399,7 @@ public class mc_86 {
                 if (ids.memMode) 
                 {
                     GetMemory(ids, w, out int address, out string addDesc); 
+                    addDesc = (w ? "word " : "byte ") + addDesc;
                     Exec.MovImmMem(w, address, addDesc, lo, hi);
                 }
                 else Exec.MovImmReg(w, GetRP(ids.rm, w), lo, hi);
@@ -440,6 +432,7 @@ public class mc_86 {
                 if (ids.memMode)
                 {
                     GetMemory(ids, w, out int address, out string addDesc);
+                    addDesc = (w ? "word " : "byte ") + addDesc;
                     if (reg == 0b000) Exec.AddImmMem(w, b0, b1, address, addDesc);
                     else if (reg == 0b101) Exec.SubImmMem(w, b0, b1, address, addDesc);
                     else if (reg == 0b111) Exec.CmpImmMem(w, b0, b1, address, addDesc);
@@ -479,6 +472,10 @@ public class mc_86 {
                     {
                         dest = new RegPt(new Reg("empty"));
                         GetMemory(ids, w, out address, out addDesc);
+                        // we know the source is operand[0] and it is mem, bc d is false
+                        // this is just from looking at casey's github
+                        // text.cpp says to add these prefixes when operand[0] is not a register i guess
+                        addDesc = (w ? "word " : "byte ") + addDesc;
                     }
                     else dest = GetRP(ids.rm, w);
                     used = src;
@@ -554,10 +551,12 @@ public class mc_86 {
 
 	public static void Main(string[] args) {
         string filePath = "";
+        bool dumpMemory = false;
         for (int i = 0; i < args.Length; i++) {
             string arg = args[i];
             if (arg.StartsWith('-')) {
                if (arg == "-d") debugPrints = true; 
+               if (arg == "-dump") dumpMemory = true;
             }   
             else {
                 filePath = arg;
@@ -584,6 +583,8 @@ public class mc_86 {
         in_bounds = true;
         index = 0;
         while (index < content.Length && in_bounds) {
+            debug("");
+            debug($"{ToBinary(content[index])}-{ToBinary(content[index + 1])}");
             Process();
             if (debugPrints)
             {
@@ -600,5 +601,11 @@ public class mc_86 {
         }
         Console.WriteLine("{0,8}: {1} {2}", "ip", ToHex(index, true), $"({index})");
         Console.WriteLine("{0,8}: {1}", "flags", GetFlags());
+
+        if (dumpMemory)
+        {
+            Console.WriteLine("dumping memory");
+            Imaginer.ConvertToPNG(Exec.memory);
+        }
     }   	
 }
