@@ -10,13 +10,14 @@ public class mc_86 {
         Low,
     }
 
-    public class Reg {
+    public class Reg 
+    {
         public string name;
         public byte hi;
         public byte lo;
-        public Reg(BaseReg baseReg, string name, SubReg sub) 
+
+        public Reg(string name) 
         {
-            this.baseName = name;
             this.name = name;
             hi = 0;
             lo = 0;
@@ -28,7 +29,15 @@ public class mc_86 {
         public Reg reg;
         public string name;
         public RegSize size;
-        public RegPt(Reg reg, string name, RegSize size)
+
+        public RegPt(Reg reg)
+        {
+            this.reg = reg;
+            this.name = reg.name;
+            this.size = RegSize.Full;
+        }
+
+        public RegPt(string name, Reg reg, RegSize size)
         {
             this.reg = reg;
             this.name = name;
@@ -176,17 +185,18 @@ public class mc_86 {
 	public static string ToBinary(int b) { return Convert.ToString(b, 2).PadLeft(8, '0'); }
 	public static void debug(string s) { if (debugPrints) Console.WriteLine(s); }
 
-    public static Reg FindReg(string baseName) 
+    public static Reg FindReg(string name) 
     {
-        Reg? reg = registers.Find(r => r.baseName == baseName);
+        Reg? reg = registers.Find(r => r.name == name);
         if (reg != null) return reg;
         else return new Reg("blank");
     }
 
-	public static void GetMemory(Ids ids, out int address, out string addDesc)
+	public static void GetMemory(Ids ids, bool w, out int address, out string addDesc)
     {
         address = 0;
 		addDesc = "unknown";
+        bool direct = false;
 		switch (ids.rm) {
 			case 0b000:
                 address = Exec.GetInt(FindReg("bx")) + Exec.GetInt(FindReg("si"));
@@ -217,7 +227,10 @@ public class mc_86 {
                     address = Exec.GetInt(FindReg("bp"));
                     addDesc = "bp";
                 }
-                else addDesc = "";
+                else {
+                    direct = true;
+                    addDesc = "";
+                }
 				break;
 			case 0b111:
                 address = Exec.GetInt(FindReg("bx"));
@@ -229,188 +242,45 @@ public class mc_86 {
 		}
         
         address += ids.data;
-        if (string.IsNullOrEmpty(addDesc)) ids.disp = ids.disp.TrimStart('+');
-        addDesc = $"[{addDesc}{ids.disp}]";
-	}
-
-	public static Reg GetRegister(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
-		string location = "unknown";
-        Reg? reg = null;
-		switch (regNum) {
-			case 0b000:
-				if (memMode) location = "bx+si";
-				else if (w) {
-                    reg = registers[0];
-                    location = "ax";
-                }
-                else {
-                    reg = new Registers[0];
-                    location = "al";
-				}
-                break;
-			case 0b001:
-				if (memMode) location = "bx+di";
-				else if (w) {
-                    reg = registers[2];
-                    location ="cx";
-                }
-				else {
-                    reg = registers[2];
-                    location ="cl";
-                }
-				break;
-			case 0b010:
-				if (memMode) location = "bp+si";
-				else if (w) {
-                    reg = registers[3];
-                    location ="dx";
-                }
-				else {
-                    reg = registers[3];
-                    location ="dl";
-                }
-				break;
-			case 0b011:
-				if (memMode) location = "bp + di";
-				else if (w) {
-                    reg = registers[1];
-                    location = "bx";
-                }
-				else {
-                    reg = registers[1];
-                    location = "bl";
-                }
-				break;
-			case 0b100:
-				if (memMode) {
-                    reg = registers[6];
-                    location = "si";
-                }
-				else if (w) {
-                    reg = registers[4];
-                    location = "sp";
-                }
-				else {
-                    reg = registers[0];
-                    location = "ah";
-                }
-				break;
-			case 0b101:
-				if (memMode) {
-                    reg = registers[7];
-                    location = "di";
-                }
-				else if (w) {
-                    reg = registers[5];
-                    location ="bp";
-                }
-				else {
-                    reg = registers[2];
-                    location ="ch";
-                }
-				break;
-			case 0b110:
-				if (memMode) {
-                    if (mod != 0) {
-                        reg = registers[5];
-                        location = "bp";
-                    }
-                    else {
-                        location = "";
-                        if (disp.Length > 3) disp = disp.Substring(3);
-                    }
-                }
-				else if (w) {
-                    reg = registers[6];
-                    location = "si";
-				}
-                else {
-                    reg = registers[3];
-                    location = "dh";
-                }
-				break;
-			case 0b111:
-                // what, bx is memory mode?
-				if (memMode) location = "bx";
-				else if (w) {
-                    reg = registers[7];
-                    location = "di";
-                }
-                else {
-                    reg = registers[1];
-                    location ="bh";
-                }
-				break;
-			default:
-				Console.WriteLine($"unhandled register number: {Convert.ToString(regNum, 2)}");
-				break;
-		}
-
-        if (reg == null) {
-            reg = new Reg("null");
-            debug($"WARNING: null reg, wanted {location}, memMode: {memMode}"); 
+        //if (string.IsNullOrEmpty(addDesc)) ids.disp = ids.disp.TrimStart('+');
+        if (direct)
+        {
+            if (w) addDesc = $"word [{addDesc}{ids.disp}]";
+            else addDesc = $"byte [{addDesc}{ids.disp}]";
         }
-        else reg.name = location;
-        return reg;
+        else addDesc = $"[{addDesc}{ids.disp}]";
 	}
 
-
-	private static string GetReg(bool memMode, int regNum, bool w, int mod=0, string disp = "") {
-		string regName = "unknown";
+	public static RegPt GetRP(int regNum, bool w) {
 		switch (regNum) {
 			case 0b000:
-				if (memMode) regName = "bx+si";
-				else if (w) regName = "ax";
-				else regName = "al";
-				break;
+				if (w) return new RegPt(registers[0]);
+                else return new RegPt("al", registers[0], RegSize.Low);
 			case 0b001:
-				if (memMode) regName = "bx+di";
-				else if (w) regName ="cx";
-				else regName ="cl";
-				break;
+				if (w) return new RegPt(registers[2]);
+                else return new RegPt("cl", registers[2], RegSize.Low);
 			case 0b010:
-				if (memMode) regName = "bp+si";
-				else if (w) regName ="dx";
-				else regName ="dl";
-				break;
+				if (w) return new RegPt(registers[3]);
+                else return new RegPt("dl", registers[3], RegSize.Low);
 			case 0b011:
-				if (memMode) regName = "bp+di";
-				else if (w) regName ="bx";
-				else regName ="bl";
-				break;
+				if (w) return new RegPt(registers[1]);
+                else return new RegPt("bl", registers[1], RegSize.Low);
 			case 0b100:
-				if (memMode) regName = "si";
-				else if (w) regName ="sp";
-				else regName ="ah";
-				break;
+				if (w) return new RegPt(registers[4]);
+                else return new RegPt("ah", registers[0], RegSize.High);
 			case 0b101:
-				if (memMode) regName = "di";
-				else if (w) regName ="bp";
-				else regName ="ch";
-				break;
+				if (w) return new RegPt(registers[5]);
+				else return new RegPt("ch", registers[2], RegSize.High);
 			case 0b110:
-				if (memMode) {
-                    if (mod != 0) regName = "bp";
-                    else {
-                        regName = "";
-                        if (disp.Length > 3) disp = disp.Substring(3);
-                    }
-                }
-				else if (w) regName ="si";
-				else regName ="dh";
-				break;
+				if (w) return new RegPt(registers[6]);
+                else return new RegPt("dh", registers[3], RegSize.High);
 			case 0b111:
-				if (memMode) regName = "bx";
-				else if (w) regName = "di";
-                else regName ="bh";
-				break;
+				if (w) return new RegPt(registers[7]);
+                else return new RegPt("bh", registers[1], RegSize.High);
 			default:
-				Console.WriteLine($"unhandled register number: {Convert.ToString(regNum, 2)}");
-				break;
+				Console.WriteLine($"unhandled regNum: {Convert.ToString(regNum, 2)}");
+                return new RegPt(new Reg("empty"));
 		}
-
-		if (memMode) return $"[{regName}{disp}]";
-		else return regName;
 	}
 
     private static void ParseModRegRM(out Ids ids) { 
@@ -492,22 +362,19 @@ public class mc_86 {
         }
         // these are imm_reg stuff
         else if (op_codes_7b.TryGetValue(b7, out info)) {
-            // 7bit codes
-            debug("shouldn't we be here?");
-            debug("found op: " + info.code + ", " + info.transfer);       
             debug("(7b)found op: " + info.code + ", " + info.transfer);       
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
-            string immReg = w ? "ax" : "al"; // looks like 0b11 is ax imm, and 0b10 is al imm, nothing else in book
+            string acReg = w ? "ax" : "al"; // looks like 0b11 is ax imm, and 0b10 is al imm, nothing else in book
             if (info.code == Op.mov_mem_acc) {
                 byte byte2 = NextByte();
                 if (w) 
                 {
                     byte byte3 = NextByte();    
                     int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
-                    Console.WriteLine($"{info.transfer} {immReg}, [{data}] (accumulator)");
+                    Console.WriteLine($"{info.transfer} {acReg}, [{data}] (accumulator)");
                 }
-                else Console.WriteLine($"{info.transfer} {immReg}, [{byte2}] (accumulator)");
+                else Console.WriteLine($"{info.transfer} {acReg}, [{byte2}] (accumulator)");
             }
             else if (info.code == Op.mov_acc_mem) {
                 byte byte2 = NextByte();
@@ -515,9 +382,9 @@ public class mc_86 {
                 {
                     byte byte3 = NextByte();    
                     int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
-                    Console.WriteLine($"{info.transfer} [{data}], {immReg} (accumulator)");
+                    Console.WriteLine($"{info.transfer} [{data}], {acReg} (accumulator)");
                 }
-                else Console.WriteLine($"{info.transfer} [{byte2}], {immReg} (accumulator)");
+                else Console.WriteLine($"{info.transfer} [{byte2}], {acReg} (accumulator)");
             }
             else if (info.code == Op.add_imm_ac || info.code == Op.sub_imm_ac || info.code == Op.cmp_imm_ac) {
                 debug("?_imm_ac");
@@ -526,27 +393,24 @@ public class mc_86 {
                 {
                     byte byte3 = NextByte();    
                     int data = BitConverter.ToInt16(new byte[] { byte2, byte3 });
-                    Console.WriteLine($"{info.transfer} {immReg}, [{data}] (accumulator)");
+                    Console.WriteLine($"{info.transfer} {acReg}, [{data}] (accumulator)");
                 }
-                else Console.WriteLine($"{info.transfer} {immReg}, [{byte2}] (accumulator)");
+                else Console.WriteLine($"{info.transfer} {acReg}, [{byte2}] (accumulator)");
             }
             else 
             {
                 // not using accumulator i think
                 debug("op.mov_imm_rm");
+                System.Diagnostics.Debug.Assert(info.code == Op.mov_imm_rm);
                 ParseModRegRM(out Ids ids);
                 byte lo = NextByte();
                 byte hi = w ? NextByte() : (byte)0;
                 if (ids.memMode) 
                 {
-                    System.Diagnostics.Debug.Assert(info.code == Op.mov_imm_rm);
-                    GetMemory(ids, out int address, out string addDesc); 
+                    GetMemory(ids, w, out int address, out string addDesc); 
                     Exec.MovImmMem(w, address, addDesc, lo, hi);
                 }
-                else 
-                {
-                    Exec.MovImmReg(w, GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp), lo, hi);
-                }
+                else Exec.MovImmReg(w, GetRP(ids.rm, w), lo, hi);
             }
         }
         else if (op_codes_6b.TryGetValue(b6, out info)) {
@@ -554,6 +418,7 @@ public class mc_86 {
             bool d = (byte1 & (1 << 1)) != 0;
             bool w = (byte1 & 1) != 0;
             debug("w: " + w);
+            debug("d: " + d);
             ParseModRegRM(out Ids ids);
             
             int reg = ids.reg;
@@ -572,64 +437,53 @@ public class mc_86 {
                 bool wReal = !d && w;
                 byte b0 = NextByte();
                 byte b1 = wReal ? NextByte() : (byte)0;
-                
-                if (reg == 0b000) Exec.operation = Exec.Opera.ADD; 
-                else if (reg == 0b101) Exec.operation = Exec.Opera.SUB; 
-                else if (reg == 0b111) Exec.operation = Exec.Opera.CMP;
-                else Console.WriteLine($"ERROR: unhandled code({info.code})with reg field({reg})");
                 if (ids.memMode)
                 {
-                    GetMemory(ids, out int address, out string addDesc);
-                    Exec.OperateImmMem(wReal, b0, b1, address, addDesc);
+                    GetMemory(ids, w, out int address, out string addDesc);
+                    if (reg == 0b000) Exec.AddImmMem(w, b0, b1, address, addDesc);
+                    else if (reg == 0b101) Exec.SubImmMem(w, b0, b1, address, addDesc);
+                    else if (reg == 0b111) Exec.CmpImmMem(w, b0, b1, address, addDesc);
+                    else Console.WriteLine($"ERROR: unhandled code({info.code})with reg field({reg})");
                 }
-                else
+                else 
                 {
-                    Reg dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp); 
-                    Exec.OperateImmReg(wReal, b0, b1, dest);
+                    RegPt rp = GetRP(ids.rm, w);
+                    if (reg == 0b000) Exec.AddImmReg(w, b0, b1, rp);
+                    else if (reg == 0b101) Exec.SubImmReg(w, b0, b1, rp);
+                    else if (reg == 0b111) Exec.CmpImmReg(w, b0, b1, rp);
+                    else Console.WriteLine($"ERROR: unhandled code({info.code})with reg field({reg})");
                 }
             }
             else { 
                 // this is where 6b codes that aren't imm_x goes!
                 // i assume it's all xx_rm_rm
                 // we have parsed mod reg rm
-                debug("d: " + d);
-                
                 int address = 0;
                 string addDesc = "undescribed";
-                Reg dest = new Reg("unsetDest"); // or just the reg involved, if only 1
-                Reg src = new Reg("unsetSrc");
-                Reg used = new Reg("unusedReg"); 
-                if (!ids.memMode) debugPrints = true;
+                RegPt? dest, src, used;
                 if (d) 
                 {
-                    dest = GetRegister(false, ids.reg, w);
+                    dest = GetRP(ids.reg, w);
                     if (ids.memMode) 
                     {
-                        GetMemory(ids, out address, out addDesc);
+                        src = new RegPt(new Reg("empty"));
+                        GetMemory(ids, w, out address, out addDesc);
                     }
-                    else src = GetRegister(false, ids.rm, w, ids.mod, ids.disp);
+                    else src = GetRP(ids.rm, w);
                     used = dest;
                 }
                 else 
                 {
-                    src = GetRegister(false, ids.reg, w);
+                    src = GetRP(ids.reg, w);
                     if (ids.memMode)
                     {
-                        GetMemory(ids, out address, out addDesc);
+                        dest = new RegPt(new Reg("empty"));
+                        GetMemory(ids, w, out address, out addDesc);
                     }
-                    else dest = GetRegister(ids.memMode, ids.rm, w, ids.mod, ids.disp);
+                    else dest = GetRP(ids.rm, w);
                     used = src;
                 }
                
-                if (!ids.memMode)
-                {
-                    Console.WriteLine("dest " + dest.name);
-                    Console.WriteLine("src " + src.name);
-                    Console.WriteLine("used " + used.name);
-                    Console.WriteLine("d: " + d);
-                    Console.WriteLine("ids.reg " + ToBinary(ids.reg) + ", w " + w);
-                }
-                debugPrints = false;
                 switch (info.transfer) 
                 {
                     case "mov":
@@ -645,9 +499,8 @@ public class mc_86 {
                         else Exec.SubRegReg(w, dest, src);   
                         break;
                     case "cmp":
-                        Exec.operation = Exec.Opera.CMP;
-                        if (ids.memMode) Exec.OperateRegMem(d, w, used, address, addDesc);
-                        else Exec.OperateRegReg(w, dest, src);
+                        if (ids.memMode) Exec.CmpRegMem(d, w, used, address, addDesc);
+                        else Exec.CmpRegReg(w, dest, src);   
                         break;
                     default:
                         Console.WriteLine($"ERROR: unhandled transfer, {info.transfer}");
@@ -655,17 +508,15 @@ public class mc_86 {
                }
             }
         }       
+        // i believe the only 4b op code we have is mov_imm_reg
         else if (op_codes_4b.TryGetValue(b4, out info)) {
             debug("(4bit)found op: " + info.code + ", " + info.transfer);
-            // i believe the only 4b op code we have is mov_imm_reg
             if (info.code != Op.mov_imm_reg) Console.WriteLine("WARNING: unhandled op");
             bool w = (byte1 & 0b00001000) != 0;
             int regNum = byte1 & 0b00000111;
             debug("regNum " + ToBinary(regNum));
             debug("w: " + w);
-            Reg reg = GetRegister(false, regNum, w);
-            if (w) Exec.MovImmReg(w, reg, NextByte(), NextByte()); 
-            else Exec.MovImmReg(w, reg, NextByte(), 0);
+            Exec.MovImmReg(w, GetRP(regNum, w), NextByte(), w ? NextByte() : (byte)0); 
         }
         else Console.WriteLine("couldn't extract op code from " + ToBinary(byte1));
 	}
@@ -745,7 +596,7 @@ public class mc_86 {
         for (int i = 0; i < registers.Count; i++) {
             Reg r = registers[i];
             int data = ToInt16(r.lo, r.hi); 
-            if (data != 0) Console.WriteLine("{0,8}: {1} {2}", r.baseName, ToHex(data, true), $"({data})");
+            if (data != 0) Console.WriteLine("{0,8}: {1} {2}", r.name, ToHex(data, true), $"({data})");
         }
         Console.WriteLine("{0,8}: {1} {2}", "ip", ToHex(index, true), $"({index})");
         Console.WriteLine("{0,8}: {1}", "flags", GetFlags());

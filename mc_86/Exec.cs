@@ -4,22 +4,18 @@ using M = mc_86;
 public static class Exec {
 
     public static byte[] memory = new byte[1024 * 1024];
-    public static Opera operation;
     
-    public enum Opera
-    {
-        NONE,
-        MOV,
-        ADD,
-        SUB,
-        CMP,
-    }
-
     public static byte[] GetBytes(int i)
     {
         byte[] b = BitConverter.GetBytes(i);
         if (!BitConverter.IsLittleEndian) Array.Reverse(b);
         return b;
+    }
+
+    public static string GetHex(M.RegPt rp) {
+        if (rp.size == M.RegSize.Full) return GetHex(rp.reg);
+        else if (rp.size == M.RegSize.High) return M.ToHex(rp.reg.hi);
+        else return M.ToHex(rp.reg.lo);
     }
 
     public static string GetHex(M.Reg reg) {
@@ -77,185 +73,160 @@ public static class Exec {
         return " ip:" + M.ToHex(M.cachedIndex) + "->" + M.ToHex(M.index);
     }
 
-    public static void MovRegMem(bool d, bool w, M.Reg reg, int address, string addDesc)
+    public static void SafeAddress(ref int address, bool w)
     {
-        // moving a word from register to memory
-        // moving a word from memory to register
-        // moving a byte from register to memory
-        // moving a byte from memory to register
         if (address < 0)
         {
-            Console.WriteLine("ERROR: address < 0, " + address);
+            Console.WriteLine("WARNING: address below zero " + address);
             address = 0;
         }
-        else if (address >= memory.Length) 
+        else if (w) 
         {
-            Console.WriteLine("ERROR: address oob " + address);
+            if (address + 1 >= memory.Length)
+            {
+                Console.WriteLine("WARNING: address oob " + address);
+                address = 0;
+            }
+        }
+        else if (address >= memory.Length)
+        {
+            Console.WriteLine("WARNING: address oob " + address);
             address = 0;
         }
-        string o = "mov "; //w ? "mov word " : "mov byte ";
-        string cached = GetHex(reg);
+    }
+
+    public static void MovRegReg(bool w, M.RegPt destPt, M.RegPt srcPt)
+    {
+        MovToReg(w, destPt, srcPt.name, srcPt.reg.lo, srcPt.reg.hi);
+    }
+
+    public static void MovRegMem(bool d, bool w, M.RegPt rp, int address, string addDesc)
+    {
+        SafeAddress(ref address, w);
+        if (d) MovToReg(w, rp, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
+        else MovToMem(w, address, addDesc, rp.name, rp.reg.lo, rp.reg.hi);
+    }
+
+    public static void MovImmMem(bool w, int addr, string addrDesc, byte lo, byte hi, bool direct)
+    {
+        SafeAddress(ref addr, w);
+        string srcDesc = GetInt(lo, hi).ToString();
+        if (direct)
+        MovToMem(w, addr, addrDesc, srcDesc, lo, hi); 
+    }
+
+    public static void MovImmReg(bool w, M.RegPt rp, byte lo, byte hi)
+    {
+        string srcDesc = GetInt(lo, hi).ToString();
+        MovToReg(w, rp, srcDesc, lo, hi);
+    }
+
+    public static void MovToReg(bool w, M.RegPt rp, string srcDesc, byte lo, byte hi)
+    {
+        string cached;
+        string result;
         if (w) 
         {
-           if (d) 
-           {
-                // to a register
-                reg.lo = memory[address];
-                if (address == memory.Length - 1) 
-                {
-                    Console.WriteLine("oob address index: " + (address + 1)); 
-                    address = 0;
-                }
-                reg.hi = memory[address + 1]; // could be oob!
-                string result = GetHex(reg);
-                Console.WriteLine($"{o}{reg.name}, {addDesc} ; {reg.name}:{cached}->{result} {GetIp()}"); 
-           }
-           else 
-           {
-                // to memory from reg 
-                memory[address] = reg.lo;
-                if (address + 1 >= memory.Length) 
-                {
-                    Console.WriteLine("oob address index: " + (address + 1)); 
-                    address = 0;
-                }
-                memory[address + 1] = reg.hi; // could be oob!
-                string result = GetHex(reg);
-                M.debug("data now at address: " + address + " " + result);
-                Console.WriteLine($"{o}{addDesc}, {reg.name} ; {GetIp()}"); 
-           }
-        }
-        else 
-        {
-            if (d) 
-            {
-                // to a register
-                // note: hi byte unchanged
-                reg.lo = memory[address];
-                string result = GetHex(reg);
-                Console.WriteLine($"{o}{reg.name}, {addDesc} ; {reg.name}:{cached}->{result} {GetIp()}"); 
-            }
-            else
-            {
-                // to memory from reg
-                // note: hi byte unchanged
-                memory[address] = reg.lo;
-                string result = GetHex(reg);
-                M.debug("data now at address: " + address + " " + result);
-                Console.WriteLine($"{o}{addDesc}, {reg.name} ; {GetIp()}"); 
-            }
-        }
-    }
-    
-    // we could be accessing a register
-    // a register + offset
-    // or direct address
-    public static void MovImmMem(bool w, int address, string addDesc, byte dataLo, byte dataHi)
-    {
-        string size = w ? "word" : "byte";
-        int data = GetInt(dataLo, dataHi);
-        string line = $"mov {addDesc}, {size} {data} ;{GetIp()}";   
-        memory[address] = dataLo;
-        if (w) memory[address + 1] = dataHi;
-        Console.WriteLine(line);
-    }
-
-    public static void MovImmReg(boool w, M.RegPt rp, byte lo, byte hi)
-    {
-        debug("MovImmReg");
-        string cached = GetHex(rp);
-        int result = lo;
-        if (rp.size == M.RegSize.Full)
-        {
+            cached = GetHex(rp.reg);
             rp.reg.lo = lo;
-            if (w) 
-            {
-                rp.reg.hi = hi;
-                result = GetInt(lo, hi);
-            }
+            rp.reg.hi = hi;
+            result = M.ToHex(GetInt(lo, hi));
         }
-        else 
+        else
         {
-            System.Diagnostics.Assert(!w);
-            if (rp.size == M.Reg.Size.High) rp.reg.hi = lo;
+            cached = M.ToHex(rp.reg.lo); 
+            if (rp.size == M.RegSize.High) rp.reg.hi = lo;
             else rp.reg.lo = lo;
+            result = M.ToHex(lo);
         }
-        string printableResult = GetInt(lo, hi).ToString();
-        if (w) printableResult = "word " + result.ToString();
-        else printableResult = "byte " + result.ToString();
-        PrintResult("mov", cached, rp.name, printableResult, GetHex(result));
+        Console.WriteLine($"mov {rp.name}, {srcDesc} ; {rp.name}:{cached}->{result}{GetIp()}"); 
     }
 
-    public static void MovImmReg(bool w, M.Reg dest, byte lo, byte hi)
+    private static void MovToMem(bool w, int addr, string addrDesc, string srcDesc, byte lo, byte hi)
     {
-        M.debug("executing MovImmReg");
-        string cached = GetHex(dest);
-        dest.hi = hi;
-        dest.lo = lo;
-        string destResult = GetInt(lo, hi).ToString();
-        if (w) destResult = "word " + destResult;
-        else destResult = "byte " + destResult;
-        PrintResult("mov", cached, dest.name, destResult, GetHex(dest));
+        string result;
+        if (w)
+        {
+            memory[addr] = lo;
+            memory[addr + 1] = hi;
+            result = GetInt(lo, hi).ToString(); 
+        }
+        else
+        {
+            memory[addr] = lo;
+            result = lo.ToString();
+        }
+        M.debug("data now at address: " + addr + " " + result);
+        Console.WriteLine($"mov {addrDesc}, {srcDesc} ;{GetIp()}"); 
     }
 
-    public static void MovRegReg(bool w, M.Reg dest, M.Reg src) {
-        M.debug("executing MovRmRm");
-        string cached = GetHex(dest); 
-        dest.lo = src.lo;
-        if (w) dest.hi = src.hi;
-        PrintResult("mov", cached, dest.name, src.name, GetHex(dest));
-    } 
-
-    public static void AddRegReg(bool w, M.Reg dest, M.Reg src) 
+    public static void AddRegReg(bool w, M.RegPt dest, M.RegPt src) 
     {
-        AddToReg(w, dest, src.name, src.lo, src.hi);
+        AddToReg(w, dest, src.name, src.reg.lo, src.reg.hi);
     }
 
-    public static void AddRegMem(bool d, bool w, M.Reg reg, int address, string addDesc)
+    public static void AddRegMem(bool d, bool w, M.RegPt rp, int address, string addDesc)
     {
-        if (d) AddToReg(w, reg, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
-        else AddToMem(w, address, addDesc, reg.name, reg.lo, reg.hi);
+        SafeAddress(ref address, w);
+        if (d) AddToReg(w, rp, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
+        else AddToMem(w, address, addDesc, rp.name, rp.reg.lo, rp.reg.hi);
     }
 
-    public static void AddImmReg(bool w, byte lo, byte hi, M.Reg dest)
+    public static void AddImmReg(bool w, byte lo, byte hi, M.RegPt rp)
     {
-        // may need to format string better
-        AddToReg(w, dest, GetInt(lo, hi).ToString(), lo, hi);
+        string srcDesc = GetInt(lo, hi).ToString();
+        AddToReg(w, rp, srcDesc, lo, hi);
     }
 
     public static void AddImmMem(bool w, byte lo, byte hi, int address, string addDesc)
     {
-        AddToMem(w, address, addDesc, GetInt(lo, hi).ToString(), lo, hi);
+        SafeAddress(ref address, w);
+        string srcDesc = w ? GetInt(lo, hi).ToString() : lo.ToString();
+        AddToMem(w, address, addDesc, srcDesc, lo, hi);
     }
 
-    // source could be register, memory, or immediate
-    public static void AddToReg(bool w, M.Reg dest, string srcDesc, byte lo, byte hi)
+    private static void AddToReg(bool w, M.RegPt rp, string srcDesc, byte lo, byte hi)
     {
-        if (string.IsNullOrEmpty(srcDesc)) srcDesc = GetInt(lo, hi).ToString();
-        string cached = GetHex(dest); 
-        int dData = GetInt(dest);
-        int sData = GetInt(lo, w ? hi : (byte)0);
-        int result = dData + sData;
-        byte[] bytes = GetBytes(result); 
-        dest.lo = bytes[0];
-        dest.hi = bytes[1];
-
+        string cached;
+        int sum;
         bool signed;
-        if (w) signed = (dest.hi & (1 << 7)) != 0;
-        else signed = (dest.lo & (1 << 7)) != 0;
+        if (w)
+        {
+            int addend = GetInt(rp.reg);
+            cached = M.ToHex(addend); 
+            sum = addend + GetInt(lo, hi);
+            byte[] bytes = GetBytes(sum); 
+            rp.reg.lo = bytes[0];
+            rp.reg.hi = bytes[1];
+            signed = (rp.reg.hi & (1 << 7)) != 0;
+        }
+        else
+        {
+            if (rp.size == M.RegSize.High)
+            {
+                cached = M.ToHex(rp.reg.hi);
+                rp.reg.hi += hi;
+                sum = rp.reg.hi;
+                signed = (rp.reg.hi & (1 << 7)) != 0;
+            }
+            else 
+            {
+                cached = M.ToHex(rp.reg.lo);
+                rp.reg.lo += lo;
+                sum = rp.reg.lo;
+                signed = (rp.reg.lo & (1 << 7)) != 0;
+            }
+        }
+        
         if (signed) M.SetFlag(M.RegFlag.Sign);
         else M.UnsetFlag(M.RegFlag.Sign);
-        if (result == 0) M.SetFlag(M.RegFlag.Zero);
+        if (sum == 0) M.SetFlag(M.RegFlag.Zero);
         else M.UnsetFlag(M.RegFlag.Zero);
-
-        // do we discard the destination's high bytes? no
-        M.debug("lo is: " + lo);
-        M.debug("dest.lo is: " + dest.lo);
-        PrintResult("add", cached, dest.name, srcDesc, GetHex(dest));
+        PrintResult("add", cached, rp.name, srcDesc, M.ToHex(sum));
     }
 
     // source could be register, memory, or immediate
-    public static void AddToMem(bool w, int address, string addDesc, string srcDesc, byte lo, byte hi)
+    private static void AddToMem(bool w, int address, string addDesc, string srcDesc, byte lo, byte hi)
     {
         if (w)
         {
@@ -276,67 +247,81 @@ public static class Exec {
         }
     }
 
-    public static void SubRegReg(bool w, M.Reg dest, M.Reg src) 
+    public static void SubRegReg(bool w, M.RegPt dest, M.RegPt src) 
     {
-        SubFromReg(w, dest, src.name, src.lo, src.hi);
+        SubFromReg(w, dest, src.name, src.reg.lo, src.reg.hi);
     }
 
-    public static void SubRegMem(bool d, bool w, M.Reg reg, int address, string addDesc)
+    public static void SubRegMem(bool d, bool w, M.RegPt rp, int address, string addDesc)
     {
-        if (d) SubFromReg(w, reg, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
-        else SubFromMem(w, address, addDesc, reg.name, reg.lo, reg.hi);
+        SafeAddress(ref address, w);
+        if (d) SubFromReg(w, rp, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
+        else SubFromMem(w, address, addDesc, rp.name, rp.reg.lo, rp.reg.hi);
     }
 
-    public static void SubImmReg(bool w, byte lo, byte hi, M.Reg dest)
+    public static void SubImmReg(bool w, byte lo, byte hi, M.RegPt rp)
     {
-        // may need to format string better
-        SubFromReg(w, dest, GetInt(lo, hi).ToString(), lo, hi);
+        string srcDesc = GetInt(lo, hi).ToString();
+        SubFromReg(w, rp, srcDesc, lo, hi);
     }
 
     public static void SubImmMem(bool w, byte lo, byte hi, int address, string addDesc)
     {
-        SubFromMem(w, address, addDesc, GetInt(lo, hi).ToString(), lo, hi);
+        SafeAddress(ref address, w);
+        string srcDesc = w ? GetInt(lo, hi).ToString() : lo.ToString();
+        SubFromMem(w, address, addDesc, srcDesc, lo, hi);
     }
 
-    // source could be register, memory, or immediate
-    public static void SubFromReg(bool w, M.Reg dest, string srcDesc, byte lo, byte hi)
+    public static void SubFromReg(bool w, M.RegPt rp, string srcDesc, byte lo, byte hi)
     {
-        int cached = GetInt(dest);
-        int result;
+        string cached;  
+        int difference;
         bool signed;
         if (w)
         {
-            result = cached - GetInt(lo, hi);
-            byte[] bytes = GetBytes(result);
-            dest.lo = bytes[0];
-            dest.hi = bytes[1];
-            signed = (dest.hi & (1 << 7)) != 0;
+            int minuend = GetInt(rp.reg);
+            cached = M.ToHex(minuend);
+            difference = minuend - GetInt(lo, hi);
+            byte[] bytes = GetBytes(difference);
+            rp.reg.lo = bytes[0];
+            rp.reg.hi = bytes[1];
+            signed = (rp.reg.hi & (1 << 7)) != 0;
         }
         else
         {
-            dest.lo = (byte)(dest.lo - lo);
-            dest.hi = 0; // dropping hi bytes?
-            result = dest.lo;
-            signed = (lo & (1 << 7)) != 0;
+            if (rp.size == M.RegSize.High)
+            {
+                cached = M.ToHex(rp.reg.hi);
+                rp.reg.hi -= hi;
+                difference = rp.reg.hi;
+                signed = (rp.reg.hi & (1 << 7)) != 0;
+            }
+            else 
+            {
+                cached = M.ToHex(rp.reg.lo);
+                rp.reg.lo -= lo;
+                difference = rp.reg.lo;
+                signed = (rp.reg.lo & (1 << 7)) != 0;
+            }
         }
 
         if (signed) M.SetFlag(M.RegFlag.Sign);
         else M.UnsetFlag(M.RegFlag.Sign);
-        if (result == 0) M.SetFlag(M.RegFlag.Zero);
+        if (difference == 0) M.SetFlag(M.RegFlag.Zero);
         else M.UnsetFlag(M.RegFlag.Zero);
-        PrintResult("sub", M.ToHex(cached), dest.name, srcDesc, GetHex(dest));  
+        PrintResult("sub", cached, rp.name, srcDesc, M.ToHex(difference));  
     }
 
     // source could be register, memory, or immediate
     public static void SubFromMem(bool w, int address, string addDesc, string srcDesc, byte lo, byte hi)
     {
         int cached = GetMem(address, w);
-        int result;
+        int difference;
         bool signed;
         if (w)
         {
-            result = cached - GetInt(lo, hi);
-            byte[] bytes = GetBytes(result);
+            difference = cached - GetInt(lo, hi);
+            byte[] bytes = GetBytes(difference);
             memory[address] = bytes[0];
             memory[address + 1] = bytes[1];
             signed = (bytes[1] & (1 << 7)) != 0;
@@ -344,144 +329,98 @@ public static class Exec {
         else
         {
             memory[address] -= lo;
-            result = memory[address];
+            difference = memory[address];
+            signed = (memory[address] & (1 << 7)) != 0;
+        }
+
+        if (signed) M.SetFlag(M.RegFlag.Sign);
+        else M.UnsetFlag(M.RegFlag.Sign);
+        if (difference == 0) M.SetFlag(M.RegFlag.Zero);
+        else M.UnsetFlag(M.RegFlag.Zero);
+        PrintResult("sub", M.ToHex(cached), addDesc, srcDesc, M.ToHex(difference));  
+    }
+
+    public static void CmpRegReg(bool w, M.RegPt dest, M.RegPt src) 
+    {
+        CmpToReg(w, dest, src.name, src.reg.lo, src.reg.hi);
+    }
+
+    public static void CmpRegMem(bool d, bool w, M.RegPt rp, int address, string addDesc)
+    {
+        SafeAddress(ref address, w);
+        if (d) CmpToReg(w, rp, addDesc, memory[address], w ? memory[address + 1] : (byte)0);
+        else CmpToMem(w, address, addDesc, rp.name, rp.reg.lo, rp.reg.hi);
+    }
+
+    public static void CmpImmReg(bool w, byte lo, byte hi, M.RegPt rp)
+    {
+        string srcDesc = GetInt(lo, hi).ToString();
+        CmpToReg(w, rp, srcDesc, lo, hi);
+    }
+
+    public static void CmpImmMem(bool w, byte lo, byte hi, int address, string addDesc)
+    {
+        SafeAddress(ref address, w);
+        string srcDesc = w ? GetInt(lo, hi).ToString() : lo.ToString();
+        CmpToMem(w, address, addDesc, srcDesc, lo, hi);
+    }
+
+    public static void CmpToReg(bool w, M.RegPt rp, string srcDesc, byte lo, byte hi)
+    {
+        int difference;
+        bool signed;
+        if (w)
+        {
+            difference = GetInt(rp.reg) - GetInt(lo, hi);
+            byte[] bytes = GetBytes(difference);
+            signed = (bytes[1] & (1 << 7)) != 0;
+        }
+        else
+        {
+            if (rp.size == M.RegSize.High)
+            {
+                difference = rp.reg.hi - hi;
+                signed = (rp.reg.hi & (1 << 7)) != 0;
+            }
+            else 
+            {
+                difference = rp.reg.lo - lo;
+                signed = (rp.reg.lo & (1 << 7)) != 0;
+            }
+        }
+
+        if (signed) M.SetFlag(M.RegFlag.Sign);
+        else M.UnsetFlag(M.RegFlag.Sign);
+        if (difference == 0) M.SetFlag(M.RegFlag.Zero);
+        else M.UnsetFlag(M.RegFlag.Zero);
+        PrintResult("cmp", "", rp.name, srcDesc, M.ToHex(difference));  
+    }
+
+    // source could be register, memory, or immediate
+    public static void CmpToMem(bool w, int address, string addDesc, string srcDesc, byte lo, byte hi)
+    {
+        int cached = GetMem(address, w);
+        int difference;
+        bool signed;
+        if (w)
+        {
+            difference = cached - GetInt(lo, hi);
+            byte[] bytes = GetBytes(difference);
+            signed = (bytes[1] & (1 << 7)) != 0;
+        }
+        else
+        {
+            difference = memory[address] - lo;
             signed = (lo & (1 << 7)) != 0;
         }
 
         if (signed) M.SetFlag(M.RegFlag.Sign);
         else M.UnsetFlag(M.RegFlag.Sign);
-        if (result == 0) M.SetFlag(M.RegFlag.Zero);
+        if (difference == 0) M.SetFlag(M.RegFlag.Zero);
         else M.UnsetFlag(M.RegFlag.Zero);
-        PrintResult("sub", M.ToHex(cached), addDesc, srcDesc, M.ToHex(result));  
+        PrintResult("cmp", M.ToHex(cached), addDesc, srcDesc, M.ToHex(difference));  
     }
-
-    // ofc, WORD or BYTE
-    // and d sets 
-    // cmp reg reg x
-    // cmp reg imm x
-    // cmp reg mem
-    // cmp mem imm
-    public static void OperateRegReg(bool w, M.Reg dest, M.Reg src)
-    {
-        if (w) Operate(GetInt(dest), GetInt(src), dest.name, src.name);
-        else Operate(dest.lo, src.lo, dest.name, src.name);
-    }
-
-    public static void OperateRegMem(bool d, bool w, M.Reg reg, int address, string addDesc)
-    {
-        if (d)
-        {
-            if (w) Operate(GetInt(reg), GetMem(address, w), reg.name, addDesc);
-            else Operate(reg.lo, GetMem(address, w), reg.name, addDesc);
-        }
-        else
-        {
-            if (w) Operate(GetMem(address, w), GetInt(reg), addDesc, reg.name);
-            else Operate(GetMem(address, w), reg.lo, addDesc, reg.name);
-        }
-    }
-
-    public static void OperateImmReg(bool w, byte lo, byte hi, M.Reg reg)
-    {
-        if (w) Operate(GetInt(reg), GetInt(lo, hi), reg.name, GetInt(lo, hi).ToString());
-        else Operate(reg.lo, lo, reg.name, lo.ToString());
-    }
-
-    public static void OperateImmMem(bool w, byte lo, byte hi, int address, string addDesc)
-    {
-        if (w) Operate(GetInt(lo, hi), GetMem(address, w), GetInt(lo, hi).ToString(), addDesc);  
-        else Operate(lo, GetMem(address, w), lo.ToString().ToString(), addDesc);
-    }
-
-    public static void Operate(int l, int r, string lDesc, string rDesc)
-    {
-        // mov, add, sub, cmp
-        switch (operation)
-        {
-            case Opera.MOV:
-                //Mov(l, r, lDesc, rDesc);
-                break;
-            case Opera.ADD:
-                //Add(l, r, lDesc, rDesc);
-                break;
-            case Opera.SUB:
-                //Sub(l, r, lDesc, rDesc);
-                break;
-            case Opera.CMP:
-                Cmp(l, r, lDesc, rDesc);
-                break;
-            default:
-                Console.WriteLine("ERROR: unhandled operation " + operation);
-                break;
-        }
-        operation = Opera.NONE;
-    }
-
-    public static void Cmp(int left, int right, string lDesc, string rDesc)
-    {
-        int diff = left - right;
-        if (diff < 0) 
-        {
-            M.SetFlag(M.RegFlag.Sign);
-            M.UnsetFlag(M.RegFlag.Zero);
-        }
-        else if (diff > 0) 
-        {
-            M.UnsetFlag(M.RegFlag.Sign);
-            M.UnsetFlag(M.RegFlag.Zero);
-        }
-        else
-        {
-            M.UnsetFlag(M.RegFlag.Sign);
-            M.SetFlag(M.RegFlag.Zero);
-        }
-        PrintResult("cmp", "", lDesc, rDesc, "", true);
-    }
-
-    public static void SubRmRm(bool w, M.Reg dest, M.Reg src)
-    {
-        M.debug("subtraction rm rm!");
-        Sub(w, dest, src.name, src.lo, src.hi);
-    }
-
-    public static void Sub(bool w, M.Reg dest, string srcLoc, byte lo, byte hi)
-    {
-        if (string.IsNullOrEmpty(srcLoc)) srcLoc = GetInt(lo, hi).ToString();
-        string cached = GetHex(dest);
-        int result = 0;
-        bool signed;
-        if (w) 
-        {
-            int dData = M.ToInt16(dest.lo, dest.hi);
-            int sData = M.ToInt16(lo, hi);
-            result = dData - sData;
-            byte[] bytes = GetBytes(result);
-            dest.lo = bytes[0];
-            dest.hi = bytes[1];
-            signed = (dest.hi & (1 << 7)) != 0;
-        }
-        else 
-        {
-            if (dest.hi != 0) Console.WriteLine("WARNING: non zero high bytes being dropped?");
-            dest.hi = 0;
-            dest.lo = (byte)(dest.lo - lo);
-            result = dest.lo;
-            signed = (dest.lo & (1 << 7)) != 0;
-        }
-        if (result == 0) 
-        {
-            M.SetFlag(M.RegFlag.Zero);
-            M.UnsetFlag(M.RegFlag.Sign);
-        }
-        else 
-        {
-            M.UnsetFlag(M.RegFlag.Zero);
-            if (signed) M.SetFlag(M.RegFlag.Sign);
-            else M.UnsetFlag(M.RegFlag.Sign);
-        }
-        PrintResult("sub", cached, dest.name, srcLoc, GetHex(dest), true);
-    }
-
+    
     public static void JumpIf(M.Op op, sbyte jump)
     {
         if (jump > 125) Console.WriteLine("jump was greater than 125, so sbyte's gonna wrap");
