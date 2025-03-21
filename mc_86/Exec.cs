@@ -107,11 +107,10 @@ public static class Exec {
         else MovToMem(w, address, addDesc, rp.name, rp.reg.lo, rp.reg.hi);
     }
 
-    public static void MovImmMem(bool w, int addr, string addrDesc, byte lo, byte hi, bool direct)
+    public static void MovImmMem(bool w, int addr, string addrDesc, byte lo, byte hi)
     {
         SafeAddress(ref addr, w);
         string srcDesc = GetInt(lo, hi).ToString();
-        if (direct)
         MovToMem(w, addr, addrDesc, srcDesc, lo, hi); 
     }
 
