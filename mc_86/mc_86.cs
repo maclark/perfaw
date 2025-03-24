@@ -192,6 +192,15 @@ public class mc_86 {
         else return new Reg("blank");
     }
 
+    // clocks for EA calculations
+    // disp only - 6
+    // base or index only - 5 (bx, bp, si, di)
+    // disp + base or index only - 9
+    // disp + base + index
+    // bp + di + disp - 11
+    // bx + si + disp - 11
+    // bp + si + disp - 12
+    // bx + di + disp - 12
 	public static void GetMemory(Ids ids, bool w, out int address, out string addDesc)
     {
         address = 0;
@@ -201,40 +210,57 @@ public class mc_86 {
 			case 0b000:
                 address = Exec.GetInt(FindReg("bx")) + Exec.GetInt(FindReg("si"));
 				addDesc = "bx+si";
+                if (ids.data == 0) Exec.eaClocks = 7;
+                else Exec.eaClocks = 11;
                 break;
 			case 0b001:
                 address = Exec.GetInt(FindReg("bx")) + Exec.GetInt(FindReg("di"));
 				addDesc = "bx+di";
+                if (ids.data == 0) Exec.eaClocks = 8;
+                else Exec.eaClocks = 12;
 				break;
 			case 0b010:
                 address = Exec.GetInt(FindReg("bp")) + Exec.GetInt(FindReg("si"));
 				addDesc = "bp+si";
+                if (ids.data == 0) Exec.eaClocks = 8;
+                else Exec.eaClocks = 12;
 				break;
 			case 0b011:
                 address = Exec.GetInt(FindReg("bp")) + Exec.GetInt(FindReg("di"));
 				addDesc = "bp+di";
+                if (ids.data == 0) Exec.eaClocks = 7;
+                else Exec.eaClocks = 11;
 				break;
 			case 0b100:
                 address = Exec.GetInt(FindReg("si"));
                 addDesc = "si";
+                if (ids.data == 0) Exec.eaClocks = 5;
+                else Exec.eaClocks = 9;
 				break;
 			case 0b101:
                 address = Exec.GetInt(FindReg("di"));
                 addDesc = "di";
+                if (ids.data == 0) Exec.eaClocks = 5;
+                else Exec.eaClocks = 9;
 				break;
 			case 0b110:
                 if (ids.mod != 0) {
                     address = Exec.GetInt(FindReg("bp"));
                     addDesc = "bp";
+                    if (ids.data == 0) Exec.eaClocks = 5;
+                    else Exec.eaClocks = 9;
                 }
                 else {
                     direct = true;
                     addDesc = "";
+                    Exec.eaClocks = 6;
                 }
 				break;
 			case 0b111:
                 address = Exec.GetInt(FindReg("bx"));
 				addDesc = "bx";
+                if (ids.data == 0) Exec.eaClocks = 5;
+                else Exec.eaClocks = 9;
 				break;
 			default:
 				Console.WriteLine($"unhandled register number: {Convert.ToString(ids.rm, 2)}");
@@ -342,6 +368,9 @@ public class mc_86 {
         // probably not necessary, i think we're going to print out the "WARNING" every time
         if (index >= content.Length) return;
 
+        Exec.opClocks = 0;
+        Exec.eaClocks = 0;
+        Exec.pClocks = 0;
         cachedIndex = index; 
         byte byte1 = NextByte();
         int b7 = byte1 >> 1;
