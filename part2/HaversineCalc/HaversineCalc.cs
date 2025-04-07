@@ -13,7 +13,8 @@ public class HaversineCalc
 
     public static void Main(string[] args)
     {
-        Generator.GeneratePairs(true, 100);    
+        // TODO pass number of pairs as an arg
+        Generator.GeneratePairs(true, 100);//100);    
         Pair[] pairs = Generator.ParsePairs("pairs.json");
         
         double average = 0;
@@ -25,6 +26,6 @@ public class HaversineCalc
         if (pairs.Length > 0) average /= pairs.Length;
         else Console.WriteLine("0 pairs"); 
 
-        Console.WriteLine("average distance: " + average);
+        Console.WriteLine("parsed average distance: " + average);
     }
 }

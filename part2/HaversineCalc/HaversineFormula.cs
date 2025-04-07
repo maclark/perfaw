@@ -18,14 +18,14 @@ public static class HaversineFormula
     {
         // i mean...do i have to do this?
         // won't all of the trig functions wrap
-        if (x0 < 0) x0 += 360;
-        else if (x0 > 180) x0 -= 360;
-        if (x1 < 0) x1 += 360;
-        else if (x1 > 180) x1 -= 360;
-        if (y0 < 0) y1 += 180;
-        else if (y0 > 90) y0 -= 180;
-        if (y1 < 0) y1 += 180;
-        else if (y1 > 180) y1 -= 180;
+        //if (x0 < 0) x0 += 360;
+        //else if (x0 > 180) x0 -= 360;
+        //if (x1 < 0) x1 += 360;
+        //else if (x1 > 180) x1 -= 360;
+        //if (y0 < 0) y1 += 180;
+        //else if (y0 > 90) y0 -= 180;
+        //if (y1 < 0) y1 += 180;
+        //else if (y1 > 180) y1 -= 180;
 
         double lon1 = x0;
         double lat1 = y0;
