@@ -14,7 +14,10 @@ public static class Imaginer
       // Convert to a Bitmap
         using (Bitmap bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb))
         {
-            int index = 64 * 4;
+            // offsetting by 64 cells (rgba is what i'm calling a cell)
+            // leaving the space for our code in 64 * 4 bytes
+            // this has to match the initial value of bp in the assembly
+            int index = 64 * 4; 
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
