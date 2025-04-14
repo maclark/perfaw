@@ -473,6 +473,16 @@ public static class Exec {
                 }
                 else Console.WriteLine($"jne ${jump} ; ip:{M.ToHex(M.cachedIndex)}->{M.ToHex(M.index)}");
                 break;
+
+            case M.Op.je:
+                if (M.CheckFlag(M.RegFlag.Zero))
+                {
+                    M.index += jump - 2; // jumping 2 back also to compensate for the 2 bytes read for this operation
+                    Console.WriteLine($"je ${jump} ; ip:{M.ToHex(M.cachedIndex)}->{M.ToHex(M.index)}");
+                }
+                else Console.WriteLine($"je ${jump} ; ip:{M.ToHex(M.cachedIndex)}->{M.ToHex(M.index)}");
+                break;
+                
             default:
                 Console.WriteLine($"{op} {jump}");
                 Console.WriteLine("ERROR: unhandled jump: " + op.ToString());
