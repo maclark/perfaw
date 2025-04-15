@@ -1,4 +1,4 @@
-/* Casey says:
+/* Max says that Casey says:
  * 
  * _CRT_SECURE_NO_WARNINGS is here bc otherwise we cannot
  * call fopen(). If we replace fopen() with fopen_s() to avoid the wanring,
@@ -147,15 +147,15 @@ int main(int ArgCount, char **Args)
         
         u64 MaxPairCount = (1ULL << 34);
         u64 PairCount = atoll(Args[3]);
-        if (PairCount < MaxPaitCount)
+        if (PairCount < MaxPairCount)
         {
             u64 ClusterCountMax = 1 + (PairCount / 64);
 
             FILE *FlexJSON = Open(PairCount, "flex", "json");
-            FILE *HaverAnswers = Open(PairCount "haveranswer", "f64");
+            FILE *HaverAnswers = Open(PairCount, "haveranswer", "f64");
             if (FlexJSON && HaverAnswers)
             {
-                fprintf(FlexJSON, "{\"pairse\":[\n");
+                fprintf(FlexJSON, "{\"pairs\":[\n");
                 f64 Sum = 0;
                 f64 SumCoef = 1.0 / (f64)PairCount;
                 for (u64 PairIndex = 0; PairIndex < PairCount; ++PairIndex)
@@ -163,13 +163,49 @@ int main(int ArgCount, char **Args)
                     if (ClusterCountLeft-- == 0)
                     {
                         ClusterCountLeft = ClusterCountMax;
-                        
+                        XCenter = RandomInRange(&Series, -MaxAllowedX, MaxAllowedX);
+                        YCenter = RandomInRange(&Series, -MaxAllowedY, MaxAllowedY);
+                        XRadius = RandomInRange(&Series, 0, MaxAllowedX); 
+                        YRadius = RandomInRange(&Series, 0, MaxAllowedY); 
                     }
-                }
-            }
-            
-        }
 
+                    f64 X0 = RandomDegree(&Series, XCenter, XRadius, MaxAllowedX);
+                    f64 Y0 = RandomDegree(&Series, YCenter, YRadius, MaxAllowedY);
+                    f64 X1 = RandomDegree(&Series, XCenter, XRadius, MaxAllowedX);
+                    f64 Y2 = RandomDegree(&Series, YCenter, YRadius, MaxAllowedY);
+
+                    f64 EarthRadius = 6372.8;
+                    f64 HaversineDistance = ReferenceHaversine(X0, Y0, X1, Y1, EarthRadius);
+
+                    Sum += SumCoef * HaversineDistance;
+
+                    char const *JSONSep = (PairIndex == (PairCount - 1)) ? "\n" : ",\n";
+                    fprintf(FlexJSON, "    {\"x0\":%.16f, \"y0\":%.16f, \"x1\":%.16f, \"y1\":%.16f}%s", X0, Y0, X1, Y1, JSONSep);
+    
+                    fwrite(&HaversineDistance, sizeof(HaversineDistance, 1, HaverAnswers);
+                }
+                fprintf(FlexJSON, "]}\n");
+                fwrite(&Sum, sizeof(Sum), 1, HaverAnswers);
+
+                fprintf(stdout, "Method: %s\n", MethodName);
+                fprintf(stdout, "Random seed: %llu\n", SeedValue);
+                fprintf(stdout, "Pair count: %llu\n", PairCount);
+                fprintf(stdout, "Expected sum: %.16f\n", Sum);
+            }
+
+            if (FlexJSON) fclase(FlexJSON);
+            if (HaverAnswers) fclose(HaverAnswers);
+        }
+        else 
+        {
+            fprintf(stderr, "To avoid accidentally generating massive files, number of pairs must be less than %llu.\n", MaxPairCount);
+        }
     }
+    else 
+    {
+        fprintf(stderr, "Usage %s [uniform/cluster] [random seed] [number of coordiante pairs to generate]\n", Args[0]); 
+    }
+
+    return 0;
 }
 
