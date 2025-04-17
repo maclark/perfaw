@@ -25,11 +25,11 @@ static f64 ReferenceHaversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 R_Earth)
     f64 lon2 = X0;
 
     f64 dLat = Deg2Rad(lat2 - lat1);
-    f64 dLong = Deg2Rad(lon2 - lon1);
+    f64 dLon = Deg2Rad(lon2 - lon1);
     lat1 = Deg2Rad(lat1);
     lat2 = Deg2Rad(lat2);
 
-    f64 a = Square(sin(dlat/2.0)) + cos(lat1)*cos(lat2)*Square(sin(dLon)/2);
+    f64 a = Square(sin(dLat/2.0)) + cos(lat1)*cos(lat2)*Square(sin(dLon)/2);
     f64 c = 2.0*asin(sqrt(a));
 
     f64 Result = R_Earth * c;

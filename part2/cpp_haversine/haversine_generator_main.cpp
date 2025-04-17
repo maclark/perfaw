@@ -11,7 +11,7 @@
  */
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <studio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
@@ -26,13 +26,13 @@ typedef double f64; // 64-bit floating point type, what i called double in c#
 
 struct random_series
 {
-    u64, A, B, C, D
+    u64 A, B, C, D;
 };
 
 static u64 RotateLeft(u64 V, int Shift)
 {
     u64 Result = ((V << Shift) | (V >> (64 - Shift)));
-    reutrn Result;
+    return Result;
 }
 
 static u64 RandomU64(random_series *Series)
@@ -74,7 +74,7 @@ static random_series Seed(u64 Value)
         RandomU64(&Series);
     }
 
-    return Result;
+    return Series;
 }
 
 static f64 RandomInRange(random_series *Series, f64 Min, f64 Max)
@@ -87,9 +87,9 @@ static f64 RandomInRange(random_series *Series, f64 Min, f64 Max)
 
 static FILE *Open(long long unsigned PairCount, char const *Label, char const *Extension)
 {
-    chat Temp[256];
+    char Temp[256];
     sprintf(Temp, "data_%llu_%s.%s", PairCount, Label, Extension);
-    File *Result = fopen(Temp, "wb");
+    FILE *Result = fopen(Temp, "wb");
     if (!Result) // null pointer check
     {
         fprintf(stderr, "Unable to open \"%s\" for writing.\n", Temp);
@@ -101,7 +101,7 @@ static FILE *Open(long long unsigned PairCount, char const *Label, char const *E
 static f64 RandomDegree(random_series *Series, f64 Center, f64 Radius, f64 MaxAllowed)
 {
     f64 MinVal = Center - Radius; // not sure why min val is capitalized the m, since it's local scoped?
-    if (MinVale < -MaxAllowed)
+    if (MinVal < -MaxAllowed)
     {
         MinVal = -MaxAllowed;
     }
@@ -133,7 +133,7 @@ int main(int ArgCount, char **Args)
         char const *MethodName = Args[1]; // a pointer to a pointer
         if (strcmp(MethodName, "cluster") == 0) // if 2nd argument isn't 'cluster', 0 it out
         {
-            ClusterCountLeft = 0; ;w
+            ClusterCountLeft = 0;
         }
         else if (strcmp(MethodName, "uniform") != 0) 
         {
@@ -172,7 +172,7 @@ int main(int ArgCount, char **Args)
                     f64 X0 = RandomDegree(&Series, XCenter, XRadius, MaxAllowedX);
                     f64 Y0 = RandomDegree(&Series, YCenter, YRadius, MaxAllowedY);
                     f64 X1 = RandomDegree(&Series, XCenter, XRadius, MaxAllowedX);
-                    f64 Y2 = RandomDegree(&Series, YCenter, YRadius, MaxAllowedY);
+                    f64 Y1 = RandomDegree(&Series, YCenter, YRadius, MaxAllowedY);
 
                     f64 EarthRadius = 6372.8;
                     f64 HaversineDistance = ReferenceHaversine(X0, Y0, X1, Y1, EarthRadius);
@@ -182,7 +182,7 @@ int main(int ArgCount, char **Args)
                     char const *JSONSep = (PairIndex == (PairCount - 1)) ? "\n" : ",\n";
                     fprintf(FlexJSON, "    {\"x0\":%.16f, \"y0\":%.16f, \"x1\":%.16f, \"y1\":%.16f}%s", X0, Y0, X1, Y1, JSONSep);
     
-                    fwrite(&HaversineDistance, sizeof(HaversineDistance, 1, HaverAnswers);
+                    fwrite(&HaversineDistance, sizeof(HaversineDistance), 1, HaverAnswers);
                 }
                 fprintf(FlexJSON, "]}\n");
                 fwrite(&Sum, sizeof(Sum), 1, HaverAnswers);
@@ -193,7 +193,7 @@ int main(int ArgCount, char **Args)
                 fprintf(stdout, "Expected sum: %.16f\n", Sum);
             }
 
-            if (FlexJSON) fclase(FlexJSON);
+            if (FlexJSON) fclose(FlexJSON);
             if (HaverAnswers) fclose(HaverAnswers);
         }
         else 
