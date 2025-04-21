@@ -77,9 +77,20 @@ static void Error(json_parser *Parser, json_token Token, char const *Message)
     fprintf(stderr, "ERROR: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
 }
 
-static void ParseKeyword(buffer Source, u64 *At, buffer KeywordReamining, json_token_type Type, json_token *Result)
+static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_token_type Type, json_token *Result)
 {
-
+    if((Source.Count - *At) >= KeywordRemaining.Count)
+    {
+        buffer Check = Source;
+        Check.Data += *At;
+        Check.Count = KeywordRemaining.Count;
+        if(AreEqual(Check, KeywordRemaining))
+        {
+            Result->Type = Type;
+            Result->Value.Count += KeywordRemaining.Count;
+            *At += KeywordRemaining.Count;
+        }
+    }
 }
 
 
@@ -108,7 +119,7 @@ static json_token GetJSONToken(json_parser *Parser)
             case '{': {Result.Type = Token_open_brace;} break;
             case '[': {Result.Type = Token_open_bracket;} break;
             case '}': {Result.Type = Token_close_brace;} break;
-            case ']': {Result.Type = Token_close_brace;} break;
+            case ']': {Result.Type = Token_close_bracket;} break;
             case ',': {Result.Type = Token_comma;} break;
             case ':': {Result.Type = Token_colon;} break;
             case ';': {Result.Type = Token_semi_colon;} break;
@@ -219,7 +230,10 @@ static json_token GetJSONToken(json_parser *Parser)
             } break;
         }
     }
+
+    Parser->At = At;
     
+    //fprintf(stdout, "parsed: \"%.*s\"\n", (int)Result.Value.Count, (char *)Result.Value.Data);
     return Result;
 }
 
@@ -307,7 +321,7 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
         }
         else
         {
-            Error(Parser, Value, "Unexpected token in JSON");
+            Error(Parser, Value, "exepected another elemnt or end type, got something else in JSON");
         }
 
         json_token Comma = GetJSONToken(Parser);
@@ -317,7 +331,7 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
         }
         else if(Comma.Type != Token_comma)
         {
-            Error(Parser, Comma, "Unexepcted token in JSON");
+            Error(Parser, Comma, "Exepected comma, got something else in JSON");
         }
     }
 
@@ -464,17 +478,21 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
 {
     u64 PairCount = 0;
 
+    fprintf(stdout, "parsing...?\n");
     json_element *JSON = ParseJSON(InputJSON);
+    fprintf(stdout, "we did parsing...?\n");
     json_element *PairsArray = LookupElement(JSON, CONSTANT_STRING("pairs"));
     if (PairsArray)
     {
+        fprintf(stdout, "pairs array...?\n");
         for(json_element *Element = PairsArray->FirstSubElement;
             Element && (PairCount < MaxPairCount);
             Element = Element->NextSibling)
         {
-
             haversine_pair *Pair = Pairs + PairCount++;
 
+
+            fprintf(stdout, "pair found\n");
             Pair->X0 = ConvertElementToF64(Element, CONSTANT_STRING("x0"));
             Pair->Y0 = ConvertElementToF64(Element, CONSTANT_STRING("y0"));
             Pair->X1 = ConvertElementToF64(Element, CONSTANT_STRING("x1"));
