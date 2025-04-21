@@ -4,11 +4,11 @@ struct buffer
     u8 *Data;
 };
 
-#define CONSTANT(String) {size(String) -1, (u8 *)(String)}
+#define CONSTANT_STRING(String) {sizeof(String) -1, (u8 *)(String)}
 
-static b32 IsInBound(buffer Source, u64 At)
+static b32 IsInBounds(buffer Source, u64 At)
 {
-    b32 Resutl = (At < Source.Count); // why do we need parens?
+    b32 Result = (At < Source.Count); // why do we need parens?
     return Result;
 }
 
@@ -23,7 +23,7 @@ static b32 AreEqual(buffer A, buffer B)
 
     for(u64 Index = 0; Index < A.Count; ++Index)
     {
-        if(A.Data[Index] != B.Data[index])
+        if(A.Data[Index] != B.Data[Index])
         {
             return false;
         }

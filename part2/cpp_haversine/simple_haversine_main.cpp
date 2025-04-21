@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include <sys/stat.h>
 
@@ -25,7 +26,7 @@ struct haversine_pair
 
 #include "haversine_formula.cpp"
 #include "buffer.cpp"
-#include "loopup_json_parser.cpp"
+#include "lookup_json_parser.cpp"
 
 static buffer ReadEntireFile(char *FileName)
 {
@@ -35,8 +36,8 @@ static buffer ReadEntireFile(char *FileName)
     if (File)
     {
 #if _WIN32
-        struct __stat64 State;
-        _state64(FileName, &Stat);
+        struct __stat64 Stat;
+        _stat64(FileName, &Stat);
 #else
         struct stat Stat;
         stat(FileName, &Stat);
@@ -59,7 +60,7 @@ static buffer ReadEntireFile(char *FileName)
     }
     else
     {
-        fprintf(stderr, "ERROR: Unable to open \"%s\", FileName);
+        fprintf(stderr, "ERROR: Unable to open \"%s\"", FileName);
     }
 
 
@@ -76,7 +77,7 @@ static f64 SumHaversineDistances(u64 PairCount, haversine_pair *Pairs)
         haversine_pair Pair = Pairs[PairIndex]; 
         f64 EarthRadius = 6372.8;
         f64 Dist = ReferenceHaversine(Pair.X0, Pair.Y0, Pair.X1, Pair.Y1, EarthRadius);
-        Sum += SumCeof * Dist;
+        Sum += SumCoef * Dist;
     }
 
     return Sum;
@@ -88,7 +89,7 @@ int main(int ArgCount, char **Args)
 
     int Result = 1;
 
-    if (ArgCount == 2) || (Argcount == 3))
+    if ((ArgCount == 2) || (ArgCount == 3))
     {
         buffer InputJSON = ReadEntireFile(Args[1]);
 
@@ -96,12 +97,12 @@ int main(int ArgCount, char **Args)
         u64 MaxPairCount = InputJSON.Count / MinimumJSONPairEncoding;
         if (MaxPairCount)
         {
-            buffer ParsedValue = AllocateBuffer(MaxPairCount * sizeof(haversin_pair));
+            buffer ParsedValues = AllocateBuffer(MaxPairCount * sizeof(haversine_pair));
             if (ParsedValues.Count)
             {
-                haversine_pair *Pairs =(Haversine_pair *)ParsedValue.Data;
+                haversine_pair *Pairs = (haversine_pair *)ParsedValues.Data;
                 u64 PairCount = ParseHaversinePairs(InputJSON, MaxPairCount, Pairs);
-                f64 Sum = SumHaverinsDistances(PairCount, Pairs);
+                f64 Sum = SumHaversineDistances(PairCount, Pairs);
 
                 fprintf(stdout, "Input size: %llu\n", InputJSON.Count);
                 fprintf(stdout, "Pair count: %llu\n", PairCount);
@@ -112,18 +113,18 @@ int main(int ArgCount, char **Args)
                     buffer AnswersF64 = ReadEntireFile(Args[2]);
                     if (AnswersF64.Count >= sizeof(f64))
                     {
-                        f64 *AnswerAvalues = (f64 *)Answers64.Data;
+                        f64 *AnswerValues = (f64 *)AnswersF64.Data;
 
                         fprintf(stdout, "\nValidations:\n");
 
                         u64 RefAnswerCount = (AnswersF64.Count - sizeof(f64)) / sizeof(f64);
                         if (PairCount != RefAnswerCount)
                         {
-                            fprint(stdout, "FAILED - pair count doesn't match %llu.\n", RefAnswerCount);
+                            fprintf(stdout, "FAILED - pair count doesn't match %llu.\n", RefAnswerCount);
                         }
 
 
-                        f64 RefSum = AnswerVaules[RefAnswerCount];
+                        f64 RefSum = AnswerValues[RefAnswerCount];
                         fprintf(stdout, "Reference sum: %.16f\n", RefSum);
                         fprintf(stdout, "Difference: %.16f\n", Sum - RefSum);
 
@@ -135,11 +136,11 @@ int main(int ArgCount, char **Args)
 
             }
 
-            FreeBuffer(&ParsedValue);
+            FreeBuffer(&ParsedValues);
         }
         else 
         {
-            fprint(stderr, "ERROR: Malformed input JSON\n");
+            fprintf(stderr, "ERROR: Malformed input JSON\n");
         }
         
         FreeBuffer(&InputJSON);

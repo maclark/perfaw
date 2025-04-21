@@ -1,3 +1,6 @@
+enum json_token_type
+{
+    Token_end_of_stream,
     Token_error,
 
     Token_open_brace,
@@ -8,7 +11,7 @@
     Token_colon, 
     Token_semi_colon,
     Token_string_literal,
-    Token_numer,
+    Token_number,
     Token_true,
     Token_false,
     Token_null,
@@ -40,7 +43,7 @@ struct json_parser
 
 static b32 IsJSONDigit(buffer Source, u64 At)
 {
-    b32 Result = false
+    b32 Result = false;
     if (IsInBounds(Source, At))
     {
         u8 Val = Source.Data[At];
@@ -53,8 +56,9 @@ static b32 IsJSONDigit(buffer Source, u64 At)
 static b32 IsJSONWhitespace(buffer Source, u64 At)
 {
     b32 Result = false;
-    if(IsInBounds(Source,t))
+    if(IsInBounds(Source, At))
     {
+        u8 Val = Source.Data[At];
         Result = ((Val == ' ') || (Val =='\t') || (Val == '\n') || (Val == '\r'));
     }
     
@@ -63,13 +67,271 @@ static b32 IsJSONWhitespace(buffer Source, u64 At)
 
 static b32 IsParsing(json_parser *Parser)
 {
-    b32 Result = !Parser-HadError && IsInBounds(Parser->Source, Parser->At);
+    b32 Result = !Parser->HadError && IsInBounds(Parser->Source, Parser->At);
     return Result;
 }
+
+static void Error(json_parser *Parser, json_token Token, char const *Message)
+{
+    Parser->HadError = true;
+    fprintf(stderr, "ERROR: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
+}
+
+static void ParseKeyword(buffer Source, u64 *At, buffer KeywordReamining, json_token_type Type, json_token *Result)
+{
+
+}
+
+
+static json_token GetJSONToken(json_parser *Parser)
+{
+    json_token Result = {};
+
+    buffer Source = Parser->Source;
+    u64 At = Parser->At;
+
+    
+    while(IsJSONWhitespace(Source, At))
+    {
+        ++At;
+    }
+
+    if(IsInBounds(Source, At))
+    {
+        Result.Type = Token_error;
+        Result.Value.Count = 1;
+        Result.Value.Data = Source.Data + At;
+        u8 Val = Source.Data[At++];
+
+        switch(Val)
+        {
+            case '{': {Result.Type = Token_open_brace;} break;
+            case '[': {Result.Type = Token_open_bracket;} break;
+            case '}': {Result.Type = Token_close_brace;} break;
+            case ']': {Result.Type = Token_close_brace;} break;
+            case ',': {Result.Type = Token_comma;} break;
+            case ':': {Result.Type = Token_colon;} break;
+            case ';': {Result.Type = Token_semi_colon;} break;
+
+            case 'f':
+            {
+                ParseKeyword(Source, &At, CONSTANT_STRING("als"), Token_false, &Result);
+            } break;
+            
+            case 'n':
+            {
+                ParseKeyword(Source, &At, CONSTANT_STRING("ull"), Token_null, &Result);
+            } break;
+
+            case 't':
+            {
+                ParseKeyword(Source, &At, CONSTANT_STRING("rue"), Token_true, &Result);
+            } break;
+
+            case '"':
+            {
+                Result.Type = Token_string_literal;
+
+                u64 StringStart = At;
+                while(IsInBounds(Source, At) && (Source.Data[At] != '"'))
+                {
+                    if (IsInBounds(Source, (At + 1)) &&
+                        (Source.Data[At] == '\\') &&
+                        (Source.Data[At + 1] == '"'))
+                    {
+                        ++At;
+                    }
+
+                    ++At;
+                }
+
+
+                Result.Value.Data = Source.Data + StringStart;
+                Result.Value.Count = At - StringStart;
+                if (IsInBounds(Source, At))
+                {
+                    ++At;
+                }
+            } break;
+
+
+            case '-':
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            {
+                u64 Start = At - 1;
+                Result.Type = Token_number;
+
+                // casey noet: move past a leading negative if one exists
+                if((Val == '-') && IsInBounds(Source, At))
+                {
+                    Val = Source.Data[At++];
+                }
+
+                // casey note: if the leading digit wasn't 0, parse any digits before the decimal
+                if(Val != '0')
+                {
+                    while(IsJSONDigit(Source, At))
+                    {
+                        ++At;
+                    }
+                }
+
+                // casey note: if decimal, parse after
+                if (IsInBounds(Source, At) && (Source.Data[At] == '.'))
+                {
+                    ++At;
+                    while(IsJSONDigit(Source, At))
+                    {
+                        ++At;
+                    }
+                }
+
+                // casey note: if it's in scientific notation, parse after 'e'
+                if (IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
+                {
+                    ++At;
+
+                    if(IsInBounds(Source, At) && ((Source.Data[At] == '+') || (Source.Data[At] == '-')))
+                    {
+                        ++At;
+                    }
+
+                    while(IsJSONDigit(Source, At))
+                    {
+                        ++At;
+                    }
+
+                    Result.Value.Count = At - Start;
+                }
+            } break;
+
+            default:
+            {
+            } break;
+        }
+    }
+    
+    return Result;
+}
+
+
+// are we forward declaring just this function?
+static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels);
+static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_token Value)
+{
+    b32 Valid = true;
+
+    json_element *SubElement = 0;
+    if(Value.Type == Token_open_bracket)
+    {
+        SubElement = ParseJSONList(Parser, Value, Token_close_bracket, false);
+    }
+    else if (Value.Type == Token_open_brace)
+    {
+        SubElement = ParseJSONList(Parser, Value, Token_close_brace, true);
+    }
+    else if((Value.Type == Token_string_literal) ||
+           (Value.Type == Token_true) ||
+           (Value.Type == Token_false) ||
+           (Value.Type == Token_null) ||
+           (Value.Type == Token_number))
+    {
+        // do nothing, according to casey
+    }
+    else
+    {
+        Valid = false;
+    }
+
+    json_element *Result = 0;
+
+    if(Valid)
+    {
+        Result = (json_element *)malloc(sizeof(json_element));
+        Result->Label = Label;
+        Result->FirstSubElement = SubElement;
+        Result->NextSibling = 0;
+    }
+
+    return Result;
+}
+
+static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels)
+{
+    json_element *FirstElement = {};
+    json_element *LastElement = {};
+
+    while(IsParsing(Parser))
+    {
+        buffer Label = {};
+        json_token Value = GetJSONToken(Parser);
+        if(HasLabels)
+        {
+            if (Value.Type == Token_string_literal)
+            {
+                Label = Value.Value;
+
+                json_token Colon = GetJSONToken(Parser);
+                if(Colon.Type == Token_colon)
+                {
+                    Value = GetJSONToken(Parser);
+                }
+                else
+                {
+                    Error(Parser, Colon, "Expected colon after field name");
+                }
+            }
+            else if(Value.Type != EndType)
+            {
+                Error(Parser, Value, "Unexepcted token in JSON");
+            }
+        }
+
+        json_element *Element = ParseJSONElement(Parser, Label, Value);
+        if (Element)
+        {
+            LastElement = (LastElement ? LastElement->NextSibling : FirstElement) = Element;
+        }
+        else if (Value.Type == EndType)
+        {
+            break;
+        }
+        else
+        {
+            Error(Parser, Value, "Unexpected token in JSON");
+        }
+
+        json_token Comma = GetJSONToken(Parser);
+        if(Comma.Type == EndType)
+        {
+            break;
+        }
+        else if(Comma.Type != Token_comma)
+        {
+            Error(Parser, Comma, "Unexepcted token in JSON");
+        }
+    }
+
+    return FirstElement;
+}
+
 
 static json_element *ParseJSON(buffer InputJSON)
 {
     json_parser Parser = {};
+    Parser.Source = InputJSON;
+
+    json_element *Result = ParseJSONElement(&Parser, {}, GetJSONToken(&Parser));
+    return Result;
 }
 
 static void FreeJSON(json_element *Element)
@@ -105,7 +367,7 @@ static json_element *LookupElement(json_element *Object, buffer ElementName)
 
 static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
 {
-    f64 At = *AtResult;
+    u64 At = *AtResult;
 
     f64 Result = 1.0;
     if(IsInBounds(Source, At) && (Source.Data[At] == '-'))
@@ -121,7 +383,7 @@ static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
 
 static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
 {
-    f64 At = *AtResult;
+    u64 At = *AtResult;
 
     f64 Result = 0.0;
     while(IsInBounds(Source, At))
@@ -143,7 +405,7 @@ static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
     return Result;
 }
 
-static f64 ConvertElementF64(json_element *Object, buffer ElementName)
+static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
 {
     f64 Result = 0.0;
     json_element *Element = LookupElement(Object, ElementName);
@@ -152,8 +414,8 @@ static f64 ConvertElementF64(json_element *Object, buffer ElementName)
         buffer Source = Element->Value;
         u64 At = 0;
 
-        f64 Sign = ConverJSONSign(Source, &At);
-        f64 Number = ConverJSONNumber(Source, &At);
+        f64 Sign = ConvertJSONSign(Source, &At);
+        f64 Number = ConvertJSONNumber(Source, &At);
 
         if (IsInBounds(Source, At) && (Source.Data[At] == '.'))
         {
@@ -179,13 +441,13 @@ static f64 ConvertElementF64(json_element *Object, buffer ElementName)
         if (IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
         {
             ++At;
-            if (IsInBounds(Source, At) && Source.Data[At] == '+'))
+            if (IsInBounds(Source, At) && (Source.Data[At] == '+'))
             {
                 ++At;
             }
 
             f64 ExponentSign = ConvertJSONSign(Source, &At);
-            f64 Exponent = ExponentSign * ConverJSONNumber(Soruce, &At);
+            f64 Exponent = ExponentSign * ConvertJSONNumber(Source, &At);
             Number *= pow(10.0, Exponent);
         }
 
