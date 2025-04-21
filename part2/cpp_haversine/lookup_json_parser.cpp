@@ -383,15 +383,23 @@ static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
 {
     u64 At = *AtResult;
 
+    fprintf(stdout, "debug: converting jsonsign%d\n", At);
     f64 Result = 1.0;
+    fprintf(stdout, "debug: about to access Source.Data[%llu]...\n", At);
+    fprintf(stdout, "debug: Source.Data = %p\n", (void *)Source.Data);
+    fprintf(stdout, "debug: At = %llu, Source.Count = %llu\n", At, Source.Count);
+    fprintf(stdout, "debug: Source.Data[%llu] = %c (0x%02x)\n", At, Source.Data[At], Source.Data[At]);
+    
     if(IsInBounds(Source, At) && (Source.Data[At] == '-'))
     {
+        fprintf(stdout, "debug: inbounds...\n");
         Result = -1.0;
         ++At;
     }
-    
+    else fprintf(stdout, "debug: outofbounds...\n");
     *AtResult = At;
 
+    fprintf(stdout, "debug: converted jsonsign\n");
     return Result;
 }
 
@@ -425,14 +433,19 @@ static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
     json_element *Element = LookupElement(Object, ElementName);
     if (Element)
     {
+        fprintf(stdout, "debug: parsing here\n");
         buffer Source = Element->Value;
         u64 At = 0;
 
         f64 Sign = ConvertJSONSign(Source, &At);
+        fprintf(stdout, "debug: converted jsonsign and num\n");
         f64 Number = ConvertJSONNumber(Source, &At);
+
+        fprintf(stdout, "debug: converted jsonsign and num\n");
 
         if (IsInBounds(Source, At) && (Source.Data[At] == '.'))
         {
+            fprintf(stdout, "debug: found decimal\n");
             ++At;
             f64 C = 1.0 / 10.0;
             while (IsInBounds(Source, At))
@@ -446,10 +459,12 @@ static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
                 }
                 else 
                 {
+                    fprintf(stdout, "debug: decimal done\n");
                     break;
                 }
             }
         }
+        else fprintf(stdout, "debug: no decimal found yet\n"); 
 
         // handle exponential notation aka scientific notation
         if (IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
@@ -468,7 +483,8 @@ static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
         Result = Sign*Number;
     }
     
-
+    
+    fprintf(stdout, "debug: parsed f64\n");
     return Result;
 }
 

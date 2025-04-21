@@ -8,7 +8,7 @@ struct buffer
 
 static b32 IsInBounds(buffer Source, u64 At)
 {
-    b32 Result = (At < Source.Count); // why do we need parens?
+    b32 Result = (At < Source.Count);
     return Result;
 }
 
