@@ -1,21 +1,37 @@
+/* ========================================================================
+
+   (C) Copyright 2023 by Molly Rocket, Inc., All Rights Reserved.
+   
+   This software is provided 'as-is', without any express or implied
+   warranty. In no event will the authors be held liable for any damages
+   arising from the use of this software.
+   
+   Please see https://computerenhance.com for more information
+   
+   ======================================================================== */
+
+/* ========================================================================
+   LISTING 69
+   ======================================================================== */
+
 enum json_token_type
 {
     Token_end_of_stream,
     Token_error,
-
+    
     Token_open_brace,
     Token_open_bracket,
     Token_close_brace,
     Token_close_bracket,
     Token_comma,
-    Token_colon, 
+    Token_colon,
     Token_semi_colon,
     Token_string_literal,
     Token_number,
     Token_true,
     Token_false,
     Token_null,
-
+    
     Token_count,
 };
 
@@ -30,7 +46,7 @@ struct json_element
     buffer Label;
     buffer Value;
     json_element *FirstSubElement;
-
+    
     json_element *NextSibling;
 };
 
@@ -44,13 +60,13 @@ struct json_parser
 static b32 IsJSONDigit(buffer Source, u64 At)
 {
     b32 Result = false;
-    if (IsInBounds(Source, At))
+    if(IsInBounds(Source, At))
     {
         u8 Val = Source.Data[At];
         Result = ((Val >= '0') && (Val <= '9'));
         fprintf(stdout, "isdigit: %d, %c\n", Result, Val);
     }
-
+    
     return Result;
 }
 
@@ -60,7 +76,7 @@ static b32 IsJSONWhitespace(buffer Source, u64 At)
     if(IsInBounds(Source, At))
     {
         u8 Val = Source.Data[At];
-        Result = ((Val == ' ') || (Val =='\t') || (Val == '\n') || (Val == '\r'));
+        Result = ((Val == ' ') || (Val == '\t') || (Val == '\n') || (Val == '\r'));
     }
     
     return Result;
@@ -78,12 +94,6 @@ static void Error(json_parser *Parser, json_token Token, char const *Message)
     fprintf(stderr, "ERROR: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
 }
 
-static void MyDebug(json_parser *Parser, json_token Token, char const *Message)
-{
-    fprintf(stdout, "DEBUG: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
-}
-
-
 static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_token_type Type, json_token *Result)
 {
     if((Source.Count - *At) >= KeywordRemaining.Count)
@@ -100,7 +110,6 @@ static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_t
     }
 }
 
-
 static json_token GetJSONToken(json_parser *Parser)
 {
     json_token Result = {};
@@ -109,19 +118,18 @@ static json_token GetJSONToken(json_parser *Parser)
     u64 At = Parser->At;
     u64 cached_at = At;
     fprintf(stdout, "GEtJSONToken at: %d\n", At);
-
+    
     while(IsJSONWhitespace(Source, At))
     {
         ++At;
     }
-
+    
     if(IsInBounds(Source, At))
     {
         Result.Type = Token_error;
         Result.Value.Count = 1;
         Result.Value.Data = Source.Data + At;
         u8 Val = Source.Data[At++];
-        
         switch(Val)
         {
             case '{': {Result.Type = Token_open_brace;} break;
@@ -134,45 +142,45 @@ static json_token GetJSONToken(json_parser *Parser)
 
             case 'f':
             {
-                ParseKeyword(Source, &At, CONSTANT_STRING("als"), Token_false, &Result);
+                ParseKeyword(Source, &At, CONSTANT_STRING("alse"), Token_false, &Result);
             } break;
             
             case 'n':
             {
                 ParseKeyword(Source, &At, CONSTANT_STRING("ull"), Token_null, &Result);
             } break;
-
+            
             case 't':
             {
                 ParseKeyword(Source, &At, CONSTANT_STRING("rue"), Token_true, &Result);
             } break;
-
+            
             case '"':
             {
                 Result.Type = Token_string_literal;
-
+                
                 u64 StringStart = At;
+                
                 while(IsInBounds(Source, At) && (Source.Data[At] != '"'))
                 {
-                    if (IsInBounds(Source, (At + 1)) &&
-                        (Source.Data[At] == '\\') &&
-                        (Source.Data[At + 1] == '"'))
+                    if(IsInBounds(Source, (At + 1)) &&
+                       (Source.Data[At] == '\\') &&
+                       (Source.Data[At + 1] == '"'))
                     {
+                        // NOTE(casey): Skip escaped quotation marks
                         ++At;
                     }
-
+                    
                     ++At;
                 }
-
-
+                
                 Result.Value.Data = Source.Data + StringStart;
                 Result.Value.Count = At - StringStart;
-                if (IsInBounds(Source, At))
+                if(IsInBounds(Source, At))
                 {
                     ++At;
                 }
             } break;
-
 
             case '-':
             case '0':
@@ -189,14 +197,14 @@ static json_token GetJSONToken(json_parser *Parser)
                 u64 Start = At - 1;
                 Result.Type = Token_number;
 
-                // casey noet: move past a leading negative if one exists
+                // NOTE(casey): Move past a leading negative sign if one exists
                 if((Val == '-') && IsInBounds(Source, At))
                 {
                     Val = Source.Data[At++];
                     fprintf(stdout, "moving past -\n");
                 }
-
-                // casey note: if the leading digit wasn't 0, parse any digits before the decimal
+                
+                // NOTE(casey): If the leading digit wasn't 0, parse any digits before the decimal point
                 if(Val != '0')
                 {
                     while(IsJSONDigit(Source, At))
@@ -204,9 +212,9 @@ static json_token GetJSONToken(json_parser *Parser)
                         ++At;
                     }
                 }
-
-                // casey note: if decimal, parse after
-                if (IsInBounds(Source, At) && (Source.Data[At] == '.'))
+                
+                // NOTE(casey): If there is a decimal point, parse any digits after the decimal point
+                if(IsInBounds(Source, At) && (Source.Data[At] == '.'))
                 {
                     ++At;
                     while(IsJSONDigit(Source, At))
@@ -214,69 +222,68 @@ static json_token GetJSONToken(json_parser *Parser)
                         ++At;
                     }
                 }
-
-                // casey note: if it's in scientific notation, parse after 'e'
-                if (IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
+                
+                // NOTE(casey): If it's in scientific notation, parse any digits after the "e"
+                if(IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
                 {
                     ++At;
-
+                    
                     if(IsInBounds(Source, At) && ((Source.Data[At] == '+') || (Source.Data[At] == '-')))
                     {
                         ++At;
                     }
-
+                    
                     while(IsJSONDigit(Source, At))
                     {
                         ++At;
                     }
-
-                    fprintf(stdout, "debug: Value.Count set to: %d", At - Start);
-                    Result.Value.Count = At - Start;
                 }
+                
+                Result.Value.Count = At - Start;
             } break;
-
+            
             default:
             {
             } break;
         }
     }
-
+    
     u64 at_jump = At - cached_at;   
     Parser->At = At;
     fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
+    
     return Result;
 }
 
-
-// are we forward declaring just this function?
 static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels);
 static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_token Value)
 {
     b32 Valid = true;
+    
     json_element *SubElement = 0;
     if(Value.Type == Token_open_bracket)
     {
         SubElement = ParseJSONList(Parser, Value, Token_close_bracket, false);
     }
-    else if (Value.Type == Token_open_brace)
+    else if(Value.Type == Token_open_brace)
     {
         SubElement = ParseJSONList(Parser, Value, Token_close_brace, true);
     }
     else if((Value.Type == Token_string_literal) ||
-           (Value.Type == Token_true) ||
-           (Value.Type == Token_false) ||
-           (Value.Type == Token_null) ||
-           (Value.Type == Token_number))
+            (Value.Type == Token_true) ||
+            (Value.Type == Token_false) ||
+            (Value.Type == Token_null) ||
+            (Value.Type == Token_number))
     {
-        // do nothing, according to casey
+        // NOTE(casey): Nothing to do here, since there is no additional data
     }
     else
     {
         Valid = false;
     }
-
+    
     json_element *Result = 0;
-
+    
     if(Valid)
     {
         Result = (json_element *)malloc(sizeof(json_element));
@@ -285,7 +292,7 @@ static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_to
         Result->FirstSubElement = SubElement;
         Result->NextSibling = 0;
     }
-
+    
     return Result;
 }
 
@@ -293,18 +300,17 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
 {
     json_element *FirstElement = {};
     json_element *LastElement = {};
-
+    
     while(IsParsing(Parser))
     {
         buffer Label = {};
         json_token Value = GetJSONToken(Parser);
-        MyDebug(Parser, Value, "parsing list");
         if(HasLabels)
         {
-            if (Value.Type == Token_string_literal)
+            if(Value.Type == Token_string_literal)
             {
                 Label = Value.Value;
-
+                
                 json_token Colon = GetJSONToken(Parser);
                 if(Colon.Type == Token_colon)
                 {
@@ -317,24 +323,24 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
             }
             else if(Value.Type != EndType)
             {
-                Error(Parser, Value, "Unexepcted token in JSON");
+                Error(Parser, Value, "Unexpected token in JSON");
             }
         }
-
+        
         json_element *Element = ParseJSONElement(Parser, Label, Value);
-        if (Element)
+        if(Element)
         {
             LastElement = (LastElement ? LastElement->NextSibling : FirstElement) = Element;
         }
-        else if (Value.Type == EndType)
+        else if(Value.Type == EndType)
         {
             break;
         }
         else
         {
-            Error(Parser, Value, "exepected another elemnt or end type, got something else in JSON");
+            Error(Parser, Value, "Unexpected token in JSON");
         }
-
+        
         json_token Comma = GetJSONToken(Parser);
         if(Comma.Type == EndType)
         {
@@ -342,19 +348,18 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
         }
         else if(Comma.Type != Token_comma)
         {
-            Error(Parser, Comma, "Exepected comma, got something else in JSON");
+            Error(Parser, Comma, "Unexpected token in JSON");
         }
     }
-
+    
     return FirstElement;
 }
-
 
 static json_element *ParseJSON(buffer InputJSON)
 {
     json_parser Parser = {};
     Parser.Source = InputJSON;
-
+    
     json_element *Result = ParseJSONElement(&Parser, {}, GetJSONToken(&Parser));
     return Result;
 }
@@ -365,7 +370,7 @@ static void FreeJSON(json_element *Element)
     {
         json_element *FreeElement = Element;
         Element = Element->NextSibling;
-
+    
         FreeJSON(FreeElement->FirstSubElement);
         free(FreeElement);
     }
@@ -374,7 +379,7 @@ static void FreeJSON(json_element *Element)
 static json_element *LookupElement(json_element *Object, buffer ElementName)
 {
     json_element *Result = 0;
-
+    
     if(Object)
     {
         for(json_element *Search = Object->FirstSubElement; Search; Search = Search->NextSibling)
@@ -386,7 +391,7 @@ static json_element *LookupElement(json_element *Object, buffer ElementName)
             }
         }
     }
-
+    
     return Result;
 }
 
@@ -395,12 +400,12 @@ static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
     u64 At = *AtResult;
 
     f64 Result = 1.0;
-    
     if(IsInBounds(Source, At) && (Source.Data[At] == '-'))
     {
         Result = -1.0;
         ++At;
     }
+    
     *AtResult = At;
 
     return Result;
@@ -409,12 +414,12 @@ static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
 static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
 {
     u64 At = *AtResult;
-
+    
     f64 Result = 0.0;
     while(IsInBounds(Source, At))
     {
         u8 Char = Source.Data[At] - (u8)'0';
-        if (Char < 10)
+        if(Char < 10)
         {
             Result = 10.0*Result + (f64)Char;
             ++At;
@@ -424,85 +429,78 @@ static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
             break;
         }
     }
-
+    
     *AtResult = At;
-
+    
     return Result;
 }
 
 static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
 {
     f64 Result = 0.0;
+    
     json_element *Element = LookupElement(Object, ElementName);
-    if (Element)
+    if(Element)
     {
         buffer Source = Element->Value;
         u64 At = 0;
-
+        
         f64 Sign = ConvertJSONSign(Source, &At);
         f64 Number = ConvertJSONNumber(Source, &At);
-
-        if (IsInBounds(Source, At) && (Source.Data[At] == '.'))
+        
+        if(IsInBounds(Source, At) && (Source.Data[At] == '.'))
         {
             ++At;
             f64 C = 1.0 / 10.0;
-            while (IsInBounds(Source, At))
+            while(IsInBounds(Source, At))
             {
                 u8 Char = Source.Data[At] - (u8)'0';
-                if (Char < 10)
+                if(Char < 10)
                 {
                     Number = Number + C*(f64)Char;
                     C *= 1.0 / 10.0;
                     ++At;
                 }
-                else 
+                else
                 {
                     break;
                 }
             }
         }
-
-        // handle exponential notation aka scientific notation
-        if (IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
+        
+        if(IsInBounds(Source, At) && ((Source.Data[At] == 'e') || (Source.Data[At] == 'E')))
         {
             ++At;
-            if (IsInBounds(Source, At) && (Source.Data[At] == '+'))
+            if(IsInBounds(Source, At) && (Source.Data[At] == '+'))
             {
                 ++At;
             }
 
             f64 ExponentSign = ConvertJSONSign(Source, &At);
-            f64 Exponent = ExponentSign * ConvertJSONNumber(Source, &At);
+            f64 Exponent = ExponentSign*ConvertJSONNumber(Source, &At);
             Number *= pow(10.0, Exponent);
         }
-
+        
         Result = Sign*Number;
     }
     
     return Result;
 }
 
-
-
 static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pair *Pairs)
 {
     u64 PairCount = 0;
-
-    fprintf(stdout, "parsing...?\n");
+    
     json_element *JSON = ParseJSON(InputJSON);
-    fprintf(stdout, "we did parsing...?\n");
     json_element *PairsArray = LookupElement(JSON, CONSTANT_STRING("pairs"));
-    if (PairsArray)
+    if(PairsArray)
     {
-        fprintf(stdout, "pairs array...?\n");
         for(json_element *Element = PairsArray->FirstSubElement;
             Element && (PairCount < MaxPairCount);
             Element = Element->NextSibling)
         {
             haversine_pair *Pair = Pairs + PairCount++;
-
-
-            fprintf(stdout, "pair found\n");
+            
             Pair->X0 = ConvertElementToF64(Element, CONSTANT_STRING("x0"));
             Pair->Y0 = ConvertElementToF64(Element, CONSTANT_STRING("y0"));
             Pair->X1 = ConvertElementToF64(Element, CONSTANT_STRING("x1"));
@@ -512,6 +510,6 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
     }
     
     FreeJSON(JSON);
-
+    
     return PairCount;
 }

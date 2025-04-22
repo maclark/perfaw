@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <math.h>
 #include <sys/stat.h>
-//#include <iostream> // temporary for max debugging
 
 typedef uint8_t u8;
 typedef uint32_t u32;
@@ -26,7 +25,8 @@ struct haversine_pair
 
 #include "haversine_formula.cpp"
 #include "buffer.cpp"
-#include "lookup_json_parser.cpp"
+#include "casey_lookup_json_parser.cpp"
+//#include "lookup_json_parser.cpp"
 
 static buffer ReadEntireFile(char *FileName)
 {
