@@ -48,7 +48,6 @@ static b32 IsJSONDigit(buffer Source, u64 At)
     {
         u8 Val = Source.Data[At];
         Result = ((Val >= '0') && (Val <= '9'));
-        fprintf(stdout, "isdigit: %d, %c\n", Result, Val);
     }
 
     return Result;
@@ -78,12 +77,6 @@ static void Error(json_parser *Parser, json_token Token, char const *Message)
     fprintf(stderr, "ERROR: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
 }
 
-static void MyDebug(json_parser *Parser, json_token Token, char const *Message)
-{
-    fprintf(stdout, "DEBUG: \"%.*s\" - %s\n", (u32)Token.Value.Count, (char *)Token.Value.Data, Message);
-}
-
-
 static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_token_type Type, json_token *Result)
 {
     if((Source.Count - *At) >= KeywordRemaining.Count)
@@ -108,7 +101,6 @@ static json_token GetJSONToken(json_parser *Parser)
     buffer Source = Parser->Source;
     u64 At = Parser->At;
     u64 cached_at = At;
-    fprintf(stdout, "GEtJSONToken at: %d\n", At);
 
     while(IsJSONWhitespace(Source, At))
     {
@@ -193,7 +185,6 @@ static json_token GetJSONToken(json_parser *Parser)
                 if((Val == '-') && IsInBounds(Source, At))
                 {
                     Val = Source.Data[At++];
-                    fprintf(stdout, "moving past -\n");
                 }
 
                 // casey note: if the leading digit wasn't 0, parse any digits before the decimal
@@ -229,10 +220,9 @@ static json_token GetJSONToken(json_parser *Parser)
                     {
                         ++At;
                     }
-
-                    fprintf(stdout, "debug: Value.Count set to: %d", At - Start);
-                    Result.Value.Count = At - Start;
                 }
+
+                Result.Value.Count = At - Start;
             } break;
 
             default:
@@ -243,7 +233,7 @@ static json_token GetJSONToken(json_parser *Parser)
 
     u64 at_jump = At - cached_at;   
     Parser->At = At;
-    fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
+    //fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
     return Result;
 }
 
@@ -488,26 +478,20 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
 {
     u64 PairCount = 0;
 
-    fprintf(stdout, "parsing...?\n");
     json_element *JSON = ParseJSON(InputJSON);
-    fprintf(stdout, "we did parsing...?\n");
     json_element *PairsArray = LookupElement(JSON, CONSTANT_STRING("pairs"));
     if (PairsArray)
     {
-        fprintf(stdout, "pairs array...?\n");
         for(json_element *Element = PairsArray->FirstSubElement;
             Element && (PairCount < MaxPairCount);
             Element = Element->NextSibling)
         {
             haversine_pair *Pair = Pairs + PairCount++;
 
-
-            fprintf(stdout, "pair found\n");
             Pair->X0 = ConvertElementToF64(Element, CONSTANT_STRING("x0"));
             Pair->Y0 = ConvertElementToF64(Element, CONSTANT_STRING("y0"));
             Pair->X1 = ConvertElementToF64(Element, CONSTANT_STRING("x1"));
             Pair->Y1 = ConvertElementToF64(Element, CONSTANT_STRING("y1"));
-            fprintf(stdout, "X0:%f, Y0:%f -> X1:%f, Y1:%f\n", Pair->X0, Pair->Y0, Pair->X1, Pair->Y1);
         }
     }
     

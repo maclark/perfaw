@@ -87,26 +87,21 @@ static f64 SumHaversineDistances(u64 PairCount, haversine_pair *Pairs)
 int main(int ArgCount, char **Args)
 {
 
-    fprintf(stdout, "did we start it?\n");
     int Result = 1;
 
     if ((ArgCount == 2) || (ArgCount == 3))
     {
-        fprintf(stdout, "here?\n");
         buffer InputJSON = ReadEntireFile(Args[1]);
 
         u32 MinimumJSONPairEncoding = 6 * 4;
         u64 MaxPairCount = InputJSON.Count / MinimumJSONPairEncoding;
         if (MaxPairCount)
         {
-            fprintf(stdout, "here?\n");
             buffer ParsedValues = AllocateBuffer(MaxPairCount * sizeof(haversine_pair));
             if (ParsedValues.Count)
             {
-                fprintf(stdout, "parired values count > 0, here?\n");
                 haversine_pair *Pairs = (haversine_pair *)ParsedValues.Data;
                 u64 PairCount = ParseHaversinePairs(InputJSON, MaxPairCount, Pairs);
-                fprintf(stdout, "pait count is %d?\n", PairCount);
                 f64 Sum = SumHaversineDistances(PairCount, Pairs);
 
                 fprintf(stdout, "Input size: %llu\n", InputJSON.Count);
@@ -115,11 +110,9 @@ int main(int ArgCount, char **Args)
 
                 if(ArgCount == 3)
                 {
-                    fprintf(stdout, "arg count 3 here?\n");
                     buffer AnswersF64 = ReadEntireFile(Args[2]);
                     if (AnswersF64.Count >= sizeof(f64))
                     {
-                        fprintf(stdout, "still here?\n");
                         f64 *AnswerValues = (f64 *)AnswersF64.Data;
 
                         fprintf(stdout, "\nValidations:\n");
@@ -140,11 +133,9 @@ int main(int ArgCount, char **Args)
 
                         fflush(stdout);
                     }
-                    else fprintf(stdout, "what is argcount%d?\n", ArgCount);
 
                     FreeBuffer(&AnswersF64);
                 }
-                else fprintf(stdout, "still here?\n");
 
             }
 
@@ -165,10 +156,6 @@ int main(int ArgCount, char **Args)
         fprintf(stderr, "       %s [haverinse_input.json] [answers.f64]\n", Args[0]);
     }
 
-    fflush(stdout);
-    fflush(stderr);
-
-    fprintf(stdout, "did we make it?\n");
     return Result;
 }
 

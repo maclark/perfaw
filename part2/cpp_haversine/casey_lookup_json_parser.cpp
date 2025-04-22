@@ -64,7 +64,6 @@ static b32 IsJSONDigit(buffer Source, u64 At)
     {
         u8 Val = Source.Data[At];
         Result = ((Val >= '0') && (Val <= '9'));
-        fprintf(stdout, "isdigit: %d, %c\n", Result, Val);
     }
     
     return Result;
@@ -117,7 +116,6 @@ static json_token GetJSONToken(json_parser *Parser)
     buffer Source = Parser->Source;
     u64 At = Parser->At;
     u64 cached_at = At;
-    fprintf(stdout, "GEtJSONToken at: %d\n", At);
     
     while(IsJSONWhitespace(Source, At))
     {
@@ -201,7 +199,6 @@ static json_token GetJSONToken(json_parser *Parser)
                 if((Val == '-') && IsInBounds(Source, At))
                 {
                     Val = Source.Data[At++];
-                    fprintf(stdout, "moving past -\n");
                 }
                 
                 // NOTE(casey): If the leading digit wasn't 0, parse any digits before the decimal point
@@ -250,7 +247,7 @@ static json_token GetJSONToken(json_parser *Parser)
     
     u64 at_jump = At - cached_at;   
     Parser->At = At;
-    fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
+    //fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
     
     return Result;
 }
@@ -505,7 +502,6 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
             Pair->Y0 = ConvertElementToF64(Element, CONSTANT_STRING("y0"));
             Pair->X1 = ConvertElementToF64(Element, CONSTANT_STRING("x1"));
             Pair->Y1 = ConvertElementToF64(Element, CONSTANT_STRING("y1"));
-            fprintf(stdout, "X0:%f, Y0:%f -> X1:%f, Y1:%f\n", Pair->X0, Pair->Y0, Pair->X1, Pair->Y1);
         }
     }
     
