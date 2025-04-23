@@ -10,8 +10,15 @@ typedef double f64;
 
 #include "platform_metrics.cpp"
 
-int main(void)
+int main(int ArgCount, char **Args) // arg0 is "os_timer_main.cpp"
 {
+    if(ArgCount == 2) 
+    {
+        printf("arg0: %s\n", Args[0]);
+        printf("arg1: %s\n", Args[1]);
+    }
+
+
     u64 Freq = GetOSTimerFreq();
     printf("     OS freq: %llu\n", Freq);
 
