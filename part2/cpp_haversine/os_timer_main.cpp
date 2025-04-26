@@ -12,33 +12,40 @@ typedef double f64;
 
 int main(int ArgCount, char **Args) // arg0 is "os_timer_main.cpp"
 {
+    u64 Duration = 1000;
     if(ArgCount == 2) 
     {
-        printf("arg0: %s\n", Args[0]);
-        printf("arg1: %s\n", Args[1]);
-
-         
+        Duration = atoi(Args[1]);
+        printf("duration %d\n", Duration);
     }
 
-
-    u64 Freq = GetOSTimerFreq();
-    printf("     OS freq: %llu\n", Freq);
+    u64 OSFreq = GetOSTimerFreq();
+    printf("     OS freq: %llu\n", OSFreq);
 
     u64 CPUStart = ReadCPUTimer(); // this is __rdtsc
-    u64 Start = ReadOSTimer();
-    u64 End = 0;
-    u64 Elapsed = 0;
-    while (Elapsed < Freq)
+    u64 OSStart = ReadOSTimer();
+    u64 OSEnd = 0;
+    u64 OSElapsed = 0;
+
+    while (OSElapsed < Duration)
     {
-        End = ReadOSTimer();
-        Elapsed = End - Start;        
-    }  
+        OSEnd = ReadOSTimer();
+        OSElapsed = OSEnd - OSStart;        
+    }
 
     u64 CPUEnd = ReadCPUTimer();
     u64 CPUElapsed = CPUEnd - CPUStart;
     
-    printf("    OS Timer: %llu -> %llu = %llu elapsed \n", Start, End, Elapsed);     
-    printf("  OS Seconds: %.4f\n", (f64)Elapsed/(f64)Freq);
+    u64 CPUFreq = 0;
+    if (OSElapsed)
+    {
+        CPUFreq = CPUElapsed * OSFreq / OSElapsed;
+    }
+
+
+    printf("    OS Timer: %llu -> %llu = %llu elapsed \n", OSStart, OSEnd, OSElapsed);     
+    printf("  OS Seconds: %.4f\n", (f64)OSElapsed/(f64)OSFreq);
 
     printf("   CPU Timer: %llu -> %llu = %llu elapsed \n", CPUStart, CPUEnd, CPUElapsed);     
+    printf("    CPU Freq: %llu (guessed)\n", CPUFreq);
 }

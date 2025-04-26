@@ -288,7 +288,6 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
     {
         buffer Label = {};
         json_token Value = GetJSONToken(Parser);
-        MyDebug(Parser, Value, "parsing list");
         if(HasLabels)
         {
             if (Value.Type == Token_string_literal)

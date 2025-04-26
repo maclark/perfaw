@@ -34,3 +34,31 @@ inline u64 ReadCPUTimer(void)
     return __rdtsc();
 }
 
+
+static u64 EstimateCPUFrequency(void)
+{
+    u64 HowLongToWait = 100; 
+    u64 OSFreq = GetOSTimerFreq();
+
+    u64 CPUStart = ReadCPUTimer();
+    u64 OSStart = ReadOSTimer();
+    u64 OSElapsed = 0;
+    u64 OSEnd = 0;
+    u64 OSWaitTime = HowLongToWait * OSFreq / 1000;
+
+    while(OSElapsed < OSWaitTime)
+    {
+        OSEnd = ReadOSTimer();
+        OSElapsed = OSEnd - OSStart;
+    }   
+
+    u64 CPUElapsed = ReadCPUTimer() - CPUStart;  
+
+    u64 CPUFreq = 0;
+    if (OSElapsed)
+    {
+        CPUFreq = CPUElapsed * OSFreq / OSElapsed;
+    }    
+
+    return CPUFreq;
+}
