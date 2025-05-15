@@ -17,14 +17,36 @@ typedef int32_t b32; // this is not a bool? b32 is signed 32-bit integer?
 typedef float f32;
 typedef double f64;
 
-#define TimeFunction() ScopedTimerFunction timer(__func__)
+
+#define CREATE_FUNCTION_TIMER() ScopedTimerFunction timer(__func__)
+
+struct TimerData 
+{
+    u64 Start;
+    u64 Elapsed;
+    const char* Func_Name;
+};
+
+#include "platform_metrics.cpp"
+
+TimerData functions_timed[1024];
+u64 functions_timed_count = 0;
 
 struct ScopedTimerFunction
 {
-    const char* name;
-    ScopedTimerFunction(const char* FuncName) : name(FuncName)
+    TimerData data;
+    ScopedTimerFunction(const char* FuncName)
     {
-        fprintf(stdout, "scopedtimerfunction!: %s\n", name);
+        data.Start = ReadCPUTimer();
+        data.Func_Name = FuncName;
+        fprintf(stdout, "Constructing scopedtimerfunction!: %s, rdtsc: %d\n", FuncName, data.Start);
+    }
+
+    ~ScopedTimerFunction()
+    {
+        u64 End = ReadCPUTimer();
+        data.Elapsed = End - data.Start;
+        fprintf(stdout, "Deconstructing scopedtimerfunction!: %s, start: %d, end: %d, elapsed: %d\n", data.Func_Name, data.Start, End, data.Elapsed);
     }
 };
 
@@ -34,7 +56,6 @@ struct haversine_pair
     f64 X1, Y1;
 };
 
-#include "platform_metrics.cpp"
 #include "haversine_formula.cpp"
 #include "buffer.cpp"
 //#include "casey_lookup_json_parser.cpp"
@@ -134,8 +155,11 @@ int main(int ArgCount, char **Args)
             {
                 haversine_pair *Pairs = (haversine_pair *)ParsedValues.Data;
 
+                fprintf(stdout, "rdtsc0 at parse hps: %d\n", ReadCPUTimer());
+                fprintf(stdout, "rdtsc1 at parse hps: %d\n", ReadCPUTimer());
                 Prof_Parse = ReadCPUTimer();
                 u64 PairCount = ParseHaversinePairs(InputJSON, MaxPairCount, Pairs);
+                fprintf(stdout, "rdtsc AFTER parse hps: %d\n", ReadCPUTimer());
                 Prof_Sum = ReadCPUTimer();
                 f64 Sum = SumHaversineDistances(PairCount, Pairs);
                 Prof_MiscOutput = ReadCPUTimer();

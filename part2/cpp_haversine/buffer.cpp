@@ -14,7 +14,6 @@ static b32 IsInBounds(buffer Source, u64 At)
 
 static b32 AreEqual(buffer A, buffer B)
 {
-    TimeFunction();
     
     if(A.Count != B.Count)
     {
