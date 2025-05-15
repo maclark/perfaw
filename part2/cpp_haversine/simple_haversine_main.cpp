@@ -17,6 +17,17 @@ typedef int32_t b32; // this is not a bool? b32 is signed 32-bit integer?
 typedef float f32;
 typedef double f64;
 
+#define TimeFunction() ScopedTimerFunction timer(__func__)
+
+struct ScopedTimerFunction
+{
+    const char* name;
+    ScopedTimerFunction(const char* FuncName) : name(FuncName)
+    {
+        fprintf(stdout, "scopedtimerfunction!: %s\n", name);
+    }
+};
+
 struct haversine_pair
 {
     f64 X0, Y0;
