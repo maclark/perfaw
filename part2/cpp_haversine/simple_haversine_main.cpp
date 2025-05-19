@@ -1,5 +1,3 @@
-
-
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
@@ -18,44 +16,15 @@ typedef float f32;
 typedef double f64;
 
 
-#define CREATE_FUNCTION_TIMER() ScopedTimerFunction timer(__func__)
-
-struct TimerData 
-{
-    u64 Start;
-    u64 Elapsed;
-    const char* Func_Name;
-};
-
-#include "platform_metrics.cpp"
-
-TimerData functions_timed[1024];
-u64 functions_timed_count = 0;
-
-struct ScopedTimerFunction
-{
-    TimerData data;
-    ScopedTimerFunction(const char* FuncName)
-    {
-        data.Start = ReadCPUTimer();
-        data.Func_Name = FuncName;
-        fprintf(stdout, "Constructing scopedtimerfunction!: %s, rdtsc: %d\n", FuncName, data.Start);
-    }
-
-    ~ScopedTimerFunction()
-    {
-        u64 End = ReadCPUTimer();
-        data.Elapsed = End - data.Start;
-        fprintf(stdout, "Deconstructing scopedtimerfunction!: %s, start: %d, end: %d, elapsed: %d\n", data.Func_Name, data.Start, End, data.Elapsed);
-    }
-};
-
 struct haversine_pair
 {
     f64 X0, Y0;
     f64 X1, Y1;
 };
 
+#define ArrayCount(array) (sizeof(array) / sizeof((array)[0]))
+
+#include "profiler.cpp"
 #include "haversine_formula.cpp"
 #include "buffer.cpp"
 //#include "casey_lookup_json_parser.cpp"
@@ -86,7 +55,6 @@ static buffer ReadEntireFile(char *FileName)
                 fprintf(stderr, "ERROR: Unable to read \"%s\".\n", FileName);
                 FreeBuffer(&Result);
             }
-
         }
         
         fclose(File);
@@ -236,4 +204,4 @@ int main(int ArgCount, char **Args)
     return Result;
 }
 
-
+static_assert(__COUNTER__ < ArrayCount(profiler::Anchors));

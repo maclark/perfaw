@@ -475,7 +475,7 @@ static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
 
 static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pair *Pairs)
 {
-    CREATE_FUNCTION_TIMER();
+    TimeFunction;
     u64 PairCount = 0;
 
     json_element *JSON = ParseJSON(InputJSON);
