@@ -13,3 +13,5 @@ bld/
 msbuild.log
 msbuild.err
 msbuild.wrn
+
+part2/cpp_haversine/data/

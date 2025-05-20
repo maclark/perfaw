@@ -203,7 +203,7 @@ int main(int ArgCount, char **Args)
     }
     else 
     {
-        fprintf(stderr, "Usage %s [uniform/cluster] [random seed] [number of coordiante pairs to generate]\n", Args[0]); 
+        fprintf(stderr, "Usage %s [uniform/cluster] [random seed] [number of coordinate pairs to generate]\n", Args[0]); 
     }
 
     return 0;

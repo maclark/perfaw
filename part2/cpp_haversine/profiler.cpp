@@ -3,6 +3,7 @@
 struct profile_anchor
 {
     u64 TSCElapsed;
+    u64 TSCElapsedChildren;
     u64 HitCount;
     const char *Label;
 };
@@ -24,39 +25,37 @@ struct profile_block
     profile_block(const char *Label_, u64 AnchorIndex_)
     {
         ParentIndex = GlobalParentIndex; 
-        GlobalParentIndex = AnchorIndex_;
 
-        Start = ReadCPUTimer();
         AnchorIndex = AnchorIndex_;
         Label = Label_;
+
+        GlobalParentIndex = AnchorIndex_;
+        Start = ReadCPUTimer();
     }
 
     ~profile_block()
     {
-
         u64 Elapsed = ReadCPUTimer() - Start;
+        GlobalParentIndex = ParentIndex;
 
-        Anchor = GlobalProfiler.Anchors + AnchorIndex;
-        Anchor->TSCElapsed = Elapsed;
+        profile_anchor *Parent = GlobalProfiler.Anchors + ParentIndex;
+        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex;
+
+        // we need to check if the parent is the same
+        if (ParentIndex != AnchorIndex) Parent->TSCElapsedChildren += Elapsed;
+        Anchor->TSCElapsed += Elapsed;
         ++Anchor->HitCount;
 
         // casey had some weak ass excuse for why he
         // didn't take care of this at compile time :)
         Anchor->Label = Label;
-
-        if (ParentIndex)
-        {
-            profile_anchor *Parent = GlobalProfiler.Anchors + ParentIndex;
-            Parent->TSCElapsed -= Elapsed;
-        }
     }
 
 
+    const char *Label;
+    u64 Start;
     u64 ParentIndex;
     u64 AnchorIndex;
-    u64 Start;
-    profile_anchor *Anchor;  
-    const char *Label;
 };
 
 #define NameConcat2(A, B) A##B
@@ -66,9 +65,15 @@ struct profile_block
 
 static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
 {
-    u64 Elapsed = Anchor->TSCElapsed;
+    u64 Elapsed = Anchor->TSCElapsed - Anchor->TSCElapsedChildren;
     f64 Percent = 100.0 * ((f64)Elapsed / (f64)TotalTSCElapsed);
-    printf("   %s[%llu]: %llu (%.2f%%)\n", Anchor->Label, Anchor->HitCount, Elapsed, Percent);
+    printf("   %s[%llu]: %llu (%.2f%%", Anchor->Label, Anchor->HitCount, Elapsed, Percent);
+    if (Anchor->TSCElapsedChildren)
+    {
+        f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsed / (f64)TotalTSCElapsed);
+        printf(", %0.2f%% w/children", PercentWithChildren);
+    }
+    printf(")\n");
 }
 
 static void BeginProfiler(void)
