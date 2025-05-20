@@ -242,6 +242,8 @@ static json_token GetJSONToken(json_parser *Parser)
 static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels);
 static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_token Value)
 {
+    TimeFunction;
+
     b32 Valid = true;
     json_element *SubElement = 0;
     if(Value.Type == Token_open_bracket)
@@ -338,44 +340,8 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
     return FirstElement;
 }
 
-//static void RecurseOnce(u32 i);
-static void RecurseOnce(u32 i)
-{
-    TimeFunction;
-    for (int i = 0; i < 100000000; i++)
-    {
-        int x = 213489;
-        int y = 2348098;
-        int z = x / y;
-    }
-    i--;
-    if (i > 0) 
-    {
-        RecurseOnce(i);
-    }
-}
-
-static void TimeTwice()
-{
-    TimeFunction;
-    for (int i = 0; i < 1000000000; i++)
-    {
-        int x = 213489;
-        int y = 2348098;
-        int z = x / y;
-    }
-    printf("having a good time\n");
-}
-
-
 static json_element *ParseJSON(buffer InputJSON)
 {
-    TimeFunction;
-
-    RecurseOnce(3);
-    for (int i = 0; i < 10; i++) TimeTwice();
-
-
     json_parser Parser = {};
     Parser.Source = InputJSON;
 
@@ -509,12 +475,14 @@ static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
 static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pair *Pairs)
 {
     TimeFunction;
+
     u64 PairCount = 0;
 
     json_element *JSON = ParseJSON(InputJSON);
     json_element *PairsArray = LookupElement(JSON, CONSTANT_STRING("pairs"));
     if (PairsArray)
     {
+        TimeBlock("Lookup and Convert");
         for(json_element *Element = PairsArray->FirstSubElement;
             Element && (PairCount < MaxPairCount);
             Element = Element->NextSibling)

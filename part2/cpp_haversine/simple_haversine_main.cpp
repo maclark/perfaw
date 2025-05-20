@@ -72,6 +72,7 @@ static buffer ReadEntireFile(char *FileName)
 static f64 SumHaversineDistances(u64 PairCount, haversine_pair *Pairs)
 {
     TimeFunction;
+
     f64 Sum = 0;
 
     f64 SumCoef = 1 / (f64)PairCount;

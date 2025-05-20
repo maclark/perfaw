@@ -2,8 +2,8 @@
 
 struct profile_anchor
 {
-    u64 TSCElapsed;
-    u64 TSCElapsedChildren;
+    u64 TSCElapsedInclusive;
+    u64 TSCElapsedExclusive;
     u64 HitCount;
     const char *Label;
 };
@@ -29,6 +29,9 @@ struct profile_block
         AnchorIndex = AnchorIndex_;
         Label = Label_;
 
+        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex;
+        OldTSCElapsedInclusive = Anchor->TSCElapsedInclusive;
+
         GlobalParentIndex = AnchorIndex_;
         Start = ReadCPUTimer();
     }
@@ -41,9 +44,9 @@ struct profile_block
         profile_anchor *Parent = GlobalProfiler.Anchors + ParentIndex;
         profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex;
 
-        // we need to check if the parent is the same
-        if (ParentIndex != AnchorIndex) Parent->TSCElapsedChildren += Elapsed;
-        Anchor->TSCElapsed += Elapsed;
+        Parent->TSCElapsedExclusive -= Elapsed;
+        Anchor->TSCElapsedExclusive += Elapsed;
+        Anchor->TSCElapsedInclusive = OldTSCElapsedInclusive + Elapsed; 
         ++Anchor->HitCount;
 
         // casey had some weak ass excuse for why he
@@ -56,6 +59,7 @@ struct profile_block
     u64 Start;
     u64 ParentIndex;
     u64 AnchorIndex;
+    u64 OldTSCElapsedInclusive;
 };
 
 #define NameConcat2(A, B) A##B
@@ -65,12 +69,11 @@ struct profile_block
 
 static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
 {
-    u64 Elapsed = Anchor->TSCElapsed - Anchor->TSCElapsedChildren;
-    f64 Percent = 100.0 * ((f64)Elapsed / (f64)TotalTSCElapsed);
-    printf("   %s[%llu]: %llu (%.2f%%", Anchor->Label, Anchor->HitCount, Elapsed, Percent);
-    if (Anchor->TSCElapsedChildren)
+    f64 Percent = 100.0 * ((f64)Anchor->TSCElapsedExclusive / (f64)TotalTSCElapsed);
+    printf("   %s[%llu]: %llu (%.2f%%", Anchor->Label, Anchor->HitCount, Anchor->TSCElapsedExclusive, Percent);
+    if (Anchor->TSCElapsedInclusive != Anchor->TSCElapsedExclusive)
     {
-        f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsed / (f64)TotalTSCElapsed);
+        f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsedInclusive / (f64)TotalTSCElapsed);
         printf(", %0.2f%% w/children", PercentWithChildren);
     }
     printf(")\n");
@@ -84,19 +87,19 @@ static void BeginProfiler(void)
 static void EndAndPrintProfiling()
 {
     GlobalProfiler.EndTSC = ReadCPUTimer();
-    u64 TotalElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
     u64 CPUFreq = EstimateCPUFrequency();
-    printf("Done! %llu\n");
+
+    u64 TotalElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
 
     if (CPUFreq)
     {
         printf("\nTotal Time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalElapsed / (f64)CPUFreq, CPUFreq);  
     }
 
-    for(u32 ArrayIndex = 0; ArrayIndex < ArrayCount(GlobalProfiler.Anchors); ++ArrayIndex)
+    for(u32 AnchorIndex = 0; AnchorIndex < ArrayCount(GlobalProfiler.Anchors); ++AnchorIndex)
     {
-        profile_anchor *Anchor = GlobalProfiler.Anchors + ArrayIndex; // ptr math so weird 
-        if (Anchor->TSCElapsed > 0)
+        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex; // ptr math so weird 
+        if (Anchor->TSCElapsedInclusive > 0)
         {
             PrintTimeElapsed(TotalElapsed, Anchor);
         }
