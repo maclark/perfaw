@@ -1,5 +1,11 @@
 #include "platform_metrics.cpp"
 
+#ifndef PROFILER
+#define PROFILER 0
+#endif
+
+#if PROFILER
+
 struct profile_anchor
 {
     u64 TSCElapsedInclusive;
@@ -7,17 +13,7 @@ struct profile_anchor
     u64 HitCount;
     const char *Label;
 };
-
-
-struct profiler
-{
-    profile_anchor Anchors[4096];
-
-    u64 StartTSC;
-    u64 EndTSC;    
-};
-static profiler GlobalProfiler;
-
+static profile_anchor GlobalProfilerAnchors[4096];
 u64 GlobalParentIndex;
 
 struct profile_block
@@ -29,7 +25,7 @@ struct profile_block
         AnchorIndex = AnchorIndex_;
         Label = Label_;
 
-        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex;
+        profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex;
         OldTSCElapsedInclusive = Anchor->TSCElapsedInclusive;
 
         GlobalParentIndex = AnchorIndex_;
@@ -41,8 +37,8 @@ struct profile_block
         u64 Elapsed = ReadCPUTimer() - Start;
         GlobalParentIndex = ParentIndex;
 
-        profile_anchor *Parent = GlobalProfiler.Anchors + ParentIndex;
-        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex;
+        profile_anchor *Parent = GlobalProfilerAnchors + ParentIndex;
+        profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex;
 
         Parent->TSCElapsedExclusive -= Elapsed;
         Anchor->TSCElapsedExclusive += Elapsed;
@@ -65,7 +61,7 @@ struct profile_block
 #define NameConcat2(A, B) A##B
 #define NameConcat(A, B) NameConcat2(A, B)
 #define TimeBlock(Name) profile_block NameConcat(BLOCK, __LINE__)(Name, __COUNTER__ + 1) 
-#define TimeFunction TimeBlock(__func__)
+#define FinalAssert static_assert(__COUNTER__ < ArrayCount(GlobalProfilerAnchors));
 
 static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
 {
@@ -79,6 +75,36 @@ static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
     printf(")\n");
 }
 
+static void PrintAnchorData(u64 TotalCPUElapsed)
+{
+    for(u32 AnchorIndex = 0; AnchorIndex < ArrayCount(GlobalProfilerAnchors); ++AnchorIndex)
+    {
+        profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex; // ptr math so weird 
+        if (Anchor->TSCElapsedInclusive > 0)
+        {
+            PrintTimeElapsed(TotalCPUElapsed, Anchor);
+        }
+    }
+}
+
+#else
+
+#define TimeBlock(...)
+#define PrintAnchorData(...)
+#define FinalAssert
+
+#endif
+
+struct profiler
+{
+    u64 StartTSC;
+    u64 EndTSC;    
+};
+static profiler GlobalProfiler;
+
+
+#define TimeFunction TimeBlock(__func__)
+
 static void BeginProfiler(void)
 {
    GlobalProfiler.StartTSC = ReadCPUTimer(); 
@@ -89,19 +115,12 @@ static void EndAndPrintProfiling()
     GlobalProfiler.EndTSC = ReadCPUTimer();
     u64 CPUFreq = EstimateCPUFrequency();
 
-    u64 TotalElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
+    u64 TotalCPUElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
 
     if (CPUFreq)
     {
-        printf("\nTotal Time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalElapsed / (f64)CPUFreq, CPUFreq);  
+        printf("\nTotal Time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalCPUElapsed / (f64)CPUFreq, CPUFreq);  
     }
-
-    for(u32 AnchorIndex = 0; AnchorIndex < ArrayCount(GlobalProfiler.Anchors); ++AnchorIndex)
-    {
-        profile_anchor *Anchor = GlobalProfiler.Anchors + AnchorIndex; // ptr math so weird 
-        if (Anchor->TSCElapsedInclusive > 0)
-        {
-            PrintTimeElapsed(TotalElapsed, Anchor);
-        }
-    }
+    
+    PrintAnchorData(TotalCPUElapsed);
 }

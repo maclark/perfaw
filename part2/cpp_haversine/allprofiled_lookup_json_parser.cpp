@@ -43,6 +43,8 @@ struct json_parser
 
 static b32 IsJSONDigit(buffer Source, u64 At)
 {
+    TimeFunction;
+
     b32 Result = false;
     if (IsInBounds(Source, At))
     {
@@ -55,6 +57,8 @@ static b32 IsJSONDigit(buffer Source, u64 At)
 
 static b32 IsJSONWhitespace(buffer Source, u64 At)
 {
+    TimeFunction;
+
     b32 Result = false;
     if(IsInBounds(Source, At))
     {
@@ -67,6 +71,8 @@ static b32 IsJSONWhitespace(buffer Source, u64 At)
 
 static b32 IsParsing(json_parser *Parser)
 {
+    TimeFunction;
+
     b32 Result = !Parser->HadError && IsInBounds(Parser->Source, Parser->At);
     return Result;
 }
@@ -79,6 +85,8 @@ static void Error(json_parser *Parser, json_token Token, char const *Message)
 
 static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_token_type Type, json_token *Result)
 {
+    TimeFunction;
+
     if((Source.Count - *At) >= KeywordRemaining.Count)
     {
         buffer Check = Source;
@@ -96,6 +104,8 @@ static void ParseKeyword(buffer Source, u64 *At, buffer KeywordRemaining, json_t
 
 static json_token GetJSONToken(json_parser *Parser)
 {
+    TimeFunction;
+
     json_token Result = {};
     
     buffer Source = Parser->Source;
@@ -242,6 +252,8 @@ static json_token GetJSONToken(json_parser *Parser)
 static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels);
 static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_token Value)
 {
+    TimeFunction;
+
     b32 Valid = true;
     json_element *SubElement = 0;
     if(Value.Type == Token_open_bracket)
@@ -281,6 +293,8 @@ static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_to
 
 static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels)
 {
+    TimeFunction;
+
     json_element *FirstElement = {};
     json_element *LastElement = {};
 
@@ -340,8 +354,6 @@ static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken
 
 static json_element *ParseJSON(buffer InputJSON)
 {
-    TimeFunction;
-
     json_parser Parser = {};
     Parser.Source = InputJSON;
 
@@ -351,6 +363,8 @@ static json_element *ParseJSON(buffer InputJSON)
 
 static void FreeJSON(json_element *Element)
 {
+    TimeFunction;
+
     while(Element)
     {
         json_element *FreeElement = Element;
@@ -398,6 +412,8 @@ static f64 ConvertJSONSign(buffer Source, u64 *AtResult)
 
 static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
 {
+    TimeFunction;
+
     u64 At = *AtResult;
 
     f64 Result = 0.0;
@@ -422,6 +438,8 @@ static f64 ConvertJSONNumber(buffer Source, u64 *AtResult)
 
 static f64 ConvertElementToF64(json_element *Object, buffer ElementName)
 {
+    TimeFunction;
+
     f64 Result = 0.0;
     json_element *Element = LookupElement(Object, ElementName);
     if (Element)
@@ -483,7 +501,6 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
     if (PairsArray)
     {
         TimeBlock("Lookup and Convert");
-
         for(json_element *Element = PairsArray->FirstSubElement;
             Element && (PairCount < MaxPairCount);
             Element = Element->NextSibling)
@@ -496,11 +513,7 @@ static u64 ParseHaversinePairs(buffer InputJSON, u64 MaxPairCount, haversine_pai
             Pair->Y1 = ConvertElementToF64(Element, CONSTANT_STRING("y1"));
         }
     }
-
-    {
-        TimeBlock("FreeJSON");
-        FreeJSON(JSON);
-    }
-
+    
+    FreeJSON(JSON);
     return PairCount;
 }

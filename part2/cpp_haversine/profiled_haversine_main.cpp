@@ -24,7 +24,8 @@ struct haversine_pair
 
 #define ArrayCount(array) (sizeof(array) / sizeof((array)[0]))
 
-#include "profiler.cpp"
+#define PROFILER 1
+#include "switchable_profiler.cpp"
 #include "haversine_formula.cpp"
 #include "buffer.cpp"
 //#include "casey_lookup_json_parser.cpp"
@@ -86,15 +87,6 @@ static f64 SumHaversineDistances(u64 PairCount, haversine_pair *Pairs)
 
     return Sum;
 }
-
-static void ProfPrint(char const *Label, u64 TotalTSCElapsed, u64 Start, u64 End)
-{
-    u64 Elapsed = End - Start;
-    f64 Percent = 100.0 * ((f64)Elapsed / (f64)TotalTSCElapsed);
-    fprintf(stdout, "   %s: %llu (%.2f%%)\n", Label, Elapsed, Percent);
-}
-
-
 
 int main(int ArgCount, char **Args)
 {
@@ -174,4 +166,4 @@ int main(int ArgCount, char **Args)
     return Result;
 }
 
-static_assert(__COUNTER__ < ArrayCount(profiler::Anchors));
+FinalAssert;
