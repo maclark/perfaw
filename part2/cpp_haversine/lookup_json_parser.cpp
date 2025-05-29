@@ -100,7 +100,7 @@ static json_token GetJSONToken(json_parser *Parser)
     
     buffer Source = Parser->Source;
     u64 At = Parser->At;
-    u64 cached_at = At;
+    //u64 cached_at = At;
 
     while(IsJSONWhitespace(Source, At))
     {
@@ -231,26 +231,24 @@ static json_token GetJSONToken(json_parser *Parser)
         }
     }
 
-    u64 at_jump = At - cached_at;   
     Parser->At = At;
-    //fprintf(stdout, "debug: got token: \"%.*s\", count: %d, AtJump: %d, At: %d\n", (int)Result.Value.Count, (char *)Result.Value.Data, at_jump, Parser->At);
     return Result;
 }
 
 
 // are we forward declaring just this function?
-static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels);
+static json_element *ParseJSONList(json_parser *Parser, json_token_type EndType, b32 HasLabels);
 static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_token Value)
 {
     b32 Valid = true;
     json_element *SubElement = 0;
     if(Value.Type == Token_open_bracket)
     {
-        SubElement = ParseJSONList(Parser, Value, Token_close_bracket, false);
+        SubElement = ParseJSONList(Parser, Token_close_bracket, false);
     }
     else if (Value.Type == Token_open_brace)
     {
-        SubElement = ParseJSONList(Parser, Value, Token_close_brace, true);
+        SubElement = ParseJSONList(Parser, Token_close_brace, true);
     }
     else if((Value.Type == Token_string_literal) ||
            (Value.Type == Token_true) ||
@@ -279,7 +277,7 @@ static json_element *ParseJSONElement(json_parser *Parser, buffer Label, json_to
     return Result;
 }
 
-static json_element *ParseJSONList(json_parser *Parser, json_token StartingToken, json_token_type EndType, b32 HasLabels)
+static json_element *ParseJSONList(json_parser *Parser, json_token_type EndType, b32 HasLabels)
 {
     json_element *FirstElement = {};
     json_element *LastElement = {};

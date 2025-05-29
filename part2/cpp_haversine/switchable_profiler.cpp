@@ -25,7 +25,7 @@ struct profile_block
 {
     profile_block(const char *Label_, u64 AnchorIndex_, u64 ByteCount)
     {
-        printf("profiling %s\n", Label);
+        printf("profiling %s\n", Label_);
         ParentIndex = GlobalParentIndex; 
 
         AnchorIndex = AnchorIndex_;
@@ -33,7 +33,7 @@ struct profile_block
 
         profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex;
         OldTSCElapsedInclusive = Anchor->TSCElapsedInclusive;
-        //Anchor->ProcessedByteCount += ByteCount;
+        Anchor->ProcessedByteCount += ByteCount;
 
         GlobalParentIndex = AnchorIndex_;
         Start = ReadCPUTimer();
@@ -158,7 +158,8 @@ static u64 EstimateBlockTimerFrequency(void)
 
 static void BeginProfiler(void)
 {
-   GlobalProfiler.StartTSC = READ_BLOCK_TIMER(); 
+    printf("BeginProfiler...\n");
+    GlobalProfiler.StartTSC = READ_BLOCK_TIMER(); 
 }
 
 static void EndAndPrintProfiling()

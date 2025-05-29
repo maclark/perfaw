@@ -22,7 +22,7 @@ static f64 ReferenceHaversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 R_Earth)
     f64 lat1 = Y0;
     f64 lat2 = Y1;
     f64 lon1 = X0;
-    f64 lon2 = X0;
+    f64 lon2 = X1;
 
     f64 dLat = Deg2Rad(lat2 - lat1);
     f64 dLon = Deg2Rad(lon2 - lon1);
