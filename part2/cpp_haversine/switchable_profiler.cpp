@@ -4,6 +4,10 @@
 #define PROFILER 0
 #endif
 
+#ifndef READ_BLOCK_TIMER
+#define READ_BLOCK_TIMER ReadCPUTimer 
+#endif
+
 #if PROFILER
 
 struct profile_anchor
@@ -11,6 +15,7 @@ struct profile_anchor
     u64 TSCElapsedInclusive;
     u64 TSCElapsedExclusive;
     u64 HitCount;
+    u64 ProcessedByteCount;
     const char *Label;
 };
 static profile_anchor GlobalProfilerAnchors[4096];
@@ -18,8 +23,9 @@ u64 GlobalParentIndex;
 
 struct profile_block
 {
-    profile_block(const char *Label_, u64 AnchorIndex_)
+    profile_block(const char *Label_, u64 AnchorIndex_, u64 ByteCount)
     {
+        printf("profiling %s\n", Label);
         ParentIndex = GlobalParentIndex; 
 
         AnchorIndex = AnchorIndex_;
@@ -27,6 +33,7 @@ struct profile_block
 
         profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex;
         OldTSCElapsedInclusive = Anchor->TSCElapsedInclusive;
+        //Anchor->ProcessedByteCount += ByteCount;
 
         GlobalParentIndex = AnchorIndex_;
         Start = ReadCPUTimer();
@@ -60,10 +67,10 @@ struct profile_block
 
 #define NameConcat2(A, B) A##B
 #define NameConcat(A, B) NameConcat2(A, B)
-#define TimeBlock(Name) profile_block NameConcat(BLOCK, __LINE__)(Name, __COUNTER__ + 1) 
+#define TimeBandwidth(Name, ByteCount) profile_block NameConcat(BLOCK, __LINE__)(Name, __COUNTER__ + 1, ByteCount) 
 #define FinalAssert static_assert(__COUNTER__ < ArrayCount(GlobalProfilerAnchors));
 
-static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
+static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor, u64 TimerFreq)
 {
     f64 Percent = 100.0 * ((f64)Anchor->TSCElapsedExclusive / (f64)TotalTSCElapsed);
     printf("   %s[%llu]: %llu (%.2f%%", Anchor->Label, Anchor->HitCount, Anchor->TSCElapsedExclusive, Percent);
@@ -72,24 +79,36 @@ static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
         f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsedInclusive / (f64)TotalTSCElapsed);
         printf(", %0.2f%% w/children", PercentWithChildren);
     }
+    if (Anchor->ProcessedByteCount && 0)
+    {
+        f64 Megabyte = 1024.0f * 1024.0f;
+        f64 Gigabyte = 1024.0f * Megabyte;
+
+        f64 Seconds = (u64)(Anchor->TSCElapsedInclusive / TimerFreq);
+        f64 BytesPerSecond = Anchor->ProcessedByteCount / Seconds;
+        f64 Megabytes = BytesPerSecond / Megabyte;
+        f64 GigabytesPerSecond = BytesPerSecond / Gigabyte;
+        
+        printf("   %0.3f mb at %0.2fgb/s", Megabytes, GigabytesPerSecond);
+    }
     printf(")\n");
 }
 
-static void PrintAnchorData(u64 TotalCPUElapsed)
+static void PrintAnchorData(u64 TotalTSCElapsed, u64 TimerFreq)
 {
     for(u32 AnchorIndex = 0; AnchorIndex < ArrayCount(GlobalProfilerAnchors); ++AnchorIndex)
     {
         profile_anchor *Anchor = GlobalProfilerAnchors + AnchorIndex; // ptr math so weird 
         if (Anchor->TSCElapsedInclusive > 0)
         {
-            PrintTimeElapsed(TotalCPUElapsed, Anchor);
+            PrintTimeElapsed(TotalTSCElapsed, Anchor, TimerFreq);
         }
     }
 }
 
 #else
 
-#define TimeBlock(...)
+#define TimeBandwidth(...)
 #define PrintAnchorData(...)
 #define FinalAssert
 
@@ -103,24 +122,56 @@ struct profiler
 static profiler GlobalProfiler;
 
 
+#define TimeBlock(Name) TimeBandwidth(Name, 0) 
 #define TimeFunction TimeBlock(__func__)
+
+static u64 EstimateBlockTimerFrequency(void)
+{
+    (void)&EstimateCPUFrequency; // to squelch compiler warning according to casey!
+
+    u64 HowLongToWait = 100; 
+    u64 OSFreq = GetOSTimerFreq();
+
+    u64 BlockStart = READ_BLOCK_TIMER();
+    u64 OSStart = ReadOSTimer();
+    u64 OSElapsed = 0;
+    u64 OSEnd = 0;
+    u64 OSWaitTime = HowLongToWait * OSFreq / 1000;
+
+    while(OSElapsed < OSWaitTime)
+    {
+        OSEnd = ReadOSTimer();
+        OSElapsed = OSEnd - OSStart;
+    }   
+
+    u64 BlockEnd = READ_BLOCK_TIMER();
+    u64 BlockElapsed = BlockEnd - BlockStart;  
+
+    u64 BlockFreq = 0;
+    if (OSElapsed)
+    {
+        BlockFreq = BlockElapsed * OSFreq / OSElapsed;
+    }    
+
+    return BlockFreq;
+}
 
 static void BeginProfiler(void)
 {
-   GlobalProfiler.StartTSC = ReadCPUTimer(); 
+   GlobalProfiler.StartTSC = READ_BLOCK_TIMER(); 
 }
 
 static void EndAndPrintProfiling()
 {
-    GlobalProfiler.EndTSC = ReadCPUTimer();
-    u64 CPUFreq = EstimateCPUFrequency();
+    GlobalProfiler.EndTSC = READ_BLOCK_TIMER(); 
+    u64 TimerFreq = EstimateBlockTimerFrequency();
 
-    u64 TotalCPUElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
+    u64 TotalTSCElapsed = GlobalProfiler.EndTSC - GlobalProfiler.StartTSC; 
 
-    if (CPUFreq)
+    if (TimerFreq)
     {
-        printf("\nTotal Time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalCPUElapsed / (f64)CPUFreq, CPUFreq);  
+        printf("\nTotal Time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalTSCElapsed / (f64)TimerFreq, TimerFreq);  
     }
-    
-    PrintAnchorData(TotalCPUElapsed);
+
+    PrintAnchorData(TotalTSCElapsed, TimerFreq);
 }
