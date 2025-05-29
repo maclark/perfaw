@@ -25,7 +25,8 @@ struct profile_block
 {
     profile_block(const char *Label_, u64 AnchorIndex_, u64 ByteCount)
     {
-        printf("profiling %s\n", Label_);
+        if (ByteCount) printf("profiling %s with ByteCount: %llu\n", Label_, ByteCount);
+        else printf("profiling %s\n", Label_);
         ParentIndex = GlobalParentIndex; 
 
         AnchorIndex = AnchorIndex_;
@@ -79,17 +80,17 @@ static void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor, u64 Ti
         f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsedInclusive / (f64)TotalTSCElapsed);
         printf(", %0.2f%% w/children", PercentWithChildren);
     }
-    if (Anchor->ProcessedByteCount && 0)
+    if (Anchor->ProcessedByteCount)
     {
         f64 Megabyte = 1024.0f * 1024.0f;
         f64 Gigabyte = 1024.0f * Megabyte;
 
-        f64 Seconds = (u64)(Anchor->TSCElapsedInclusive / TimerFreq);
-        f64 BytesPerSecond = Anchor->ProcessedByteCount / Seconds;
-        f64 Megabytes = BytesPerSecond / Megabyte;
+        f64 Seconds = (f64)Anchor->TSCElapsedInclusive / (f64)TimerFreq;
+        f64 BytesPerSecond = (f64)Anchor->ProcessedByteCount / Seconds;
+        f64 Megabytes = (f64)Anchor->ProcessedByteCount / (f64)Megabyte;
         f64 GigabytesPerSecond = BytesPerSecond / Gigabyte;
         
-        printf("   %0.3f mb at %0.2fgb/s", Megabytes, GigabytesPerSecond);
+        printf("  %0.3f mb at %0.2f gb/s", Megabytes, GigabytesPerSecond);
     }
     printf(")\n");
 }
