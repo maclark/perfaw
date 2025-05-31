@@ -1,10 +1,10 @@
 /*
  * ok
  * we want to do fread, _read, and ReadFile, which i guess are in windows.h somewhere?
- * we need an instance of Timer struct and then we can get a pointer to it and pass that around
+ * we need an instance of Tester struct and then we can get a pointer to it and pass that around
  *
  * we need to typedef a function that runs the program
- * i think it needs return void and accept a pointer to the Timer and then maybe data amount?
+ * i think it needs return void and accept a pointer to the Tester and then maybe data amount?
  * hm
  * we want
  * count of times run
@@ -14,6 +14,8 @@
  */
 
 #include <windows.h>
+#include <fcntl.h>
+#include <io.h>
 
 struct read_parameters
 {
@@ -23,7 +25,7 @@ struct read_parameters
 
 typedef void read_overhead_test_func(repetition_tester *Tester, read_parameters *Params);
 
-static void ReadiViaFRead(timer_data *Timer, read_parameters *Params)
+static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
 {
     // do the read
     while(IsTesting(Tester))
@@ -34,9 +36,9 @@ static void ReadiViaFRead(timer_data *Timer, read_parameters *Params)
 
             buffer DestBuffer = Params->Dest;
 
-            BeginTimer(Tester);
+            BeginTester(Tester);
             size_t Result = fread(DestBuffer.Data, DestBuffer.Count, 1, File);   
-            EndTimer(Tester);
+            EndTester(Tester);
 
             if(Result == 1)
             {
@@ -58,29 +60,31 @@ static void ReadiViaFRead(timer_data *Timer, read_parameters *Params)
     }
 }
 
-static void ReadViaRead(timer_data *Timer, read_parameters *Params)
+static void ReadViaRead(repetition_tester *Tester, read_parameters *Params)
 {
     while(IsTesting(Tester))
     {
         // remember, int is like a bool?
-        int File = _open(Params->FileName, _0_BINARY|_0_RDONLY); 
+        int File = _open(Params->FileName, _O_BINARY|_O_RDONLY); 
         if(File != -1)
         {
 
             buffer DestBuffer = Params->Dest;
 
+            
             u8 *Dest = DestBuffer.Data;
             u64 SizeRemaining = DestBuffer.Count;
             while(SizeRemaining)
             {
+                u32 ReadSize = INT_MAX;
                 if((u64)ReadSize > SizeRemaining)
                 {
                     ReadSize = (u32)SizeRemaining;
                 }
 
-                BeginTimer(Tester);
+                BeginTester(Tester);
                 int Result = _read(File, Dest, ReadSize);   
-                EndTimer(Tester);
+                EndTester(Tester);
 
                 if(Result == (int)ReadSize)
                 {
@@ -105,12 +109,12 @@ static void ReadViaRead(timer_data *Timer, read_parameters *Params)
     }
 }
 
-static void ReadViaReadFile(timer_data *Timer, read_parameters *Params)
+static void ReadViaReadFile(repetition_tester *Tester, read_parameters *Params)
 {
     while(IsTesting(Tester))
     {
-        HANDLE File = CreateFileA(Params->FIleName, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, 0,
-                                  OPEN_EXISTING, FILE_ATTIRBUTE_NORMAL, 0);
+        HANDLE File = CreateFileA(Params->FileName, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, 0,
+                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
         if(File != INVALID_HANDLE_VALUE)
         {
             buffer DestBuffer = Params->Dest;
@@ -126,9 +130,9 @@ static void ReadViaReadFile(timer_data *Timer, read_parameters *Params)
                 }
 
                 DWORD BytesRead = 0;
-                BeginTimer(Tester);
+                BeginTester(Tester);
                 BOOL Result = ReadFile(File, Dest, ReadSize, &BytesRead, 0);   
-                EndTimer(Tester);
+                EndTester(Tester);
 
                 if(Result && (BytesRead ==  ReadSize))
                 {
