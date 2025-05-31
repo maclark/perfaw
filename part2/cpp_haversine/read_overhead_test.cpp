@@ -36,9 +36,9 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
 
             buffer DestBuffer = Params->Dest;
 
-            BeginTester(Tester);
+            BeginTime(Tester);
             size_t Result = fread(DestBuffer.Data, DestBuffer.Count, 1, File);   
-            EndTester(Tester);
+            EndTime(Tester);
 
             if(Result == 1)
             {
@@ -48,7 +48,6 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
             {
                 Error(Tester, "fread failed");
             }
-
 
             fclose(File);
 
@@ -82,9 +81,9 @@ static void ReadViaRead(repetition_tester *Tester, read_parameters *Params)
                     ReadSize = (u32)SizeRemaining;
                 }
 
-                BeginTester(Tester);
+                BeginTime(Tester);
                 int Result = _read(File, Dest, ReadSize);   
-                EndTester(Tester);
+                EndTime(Tester);
 
                 if(Result == (int)ReadSize)
                 {
@@ -130,9 +129,9 @@ static void ReadViaReadFile(repetition_tester *Tester, read_parameters *Params)
                 }
 
                 DWORD BytesRead = 0;
-                BeginTester(Tester);
+                BeginTime(Tester);
                 BOOL Result = ReadFile(File, Dest, ReadSize, &BytesRead, 0);   
-                EndTester(Tester);
+                EndTime(Tester);
 
                 if(Result && (BytesRead ==  ReadSize))
                 {

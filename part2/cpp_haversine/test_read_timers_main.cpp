@@ -1,6 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <sys/stat.h>
 
@@ -13,7 +13,7 @@ typedef int32_t b32;
 typedef float f32;
 typedef double f64;
 
-#define ArrayCount(arry) (sizeof(array) / sizeof((array)[0]))
+#define ArrayCount(array) (sizeof(array) / sizeof((array)[0]))
 
 #include "buffer.cpp"
 #include "platform_metrics.cpp"
@@ -39,8 +39,7 @@ int main(int ArgCount, char **Args)
     (void)&IsInBounds;
     (void)&AreEqual;
 
-    // we create parallel array of read_parameters?
-    // we need to get the file from the args
+    u64 CPUTimerFreq = EstimateCPUFrequency();
 
     if (ArgCount == 2)
     {
@@ -54,31 +53,32 @@ int main(int ArgCount, char **Args)
 #endif
 
         read_parameters Params = {};
-        Params.Dest = AllocateBuffer(State.st_size); 
+        Params.Dest = AllocateBuffer(Stat.st_size); 
         Params.FileName = Args[1];
 
-        for(;;)
+        if(Params.Dest.Count > 0)
         {
-            repetition_tester *Testers[ArrayCount(TestFuncs)] = {}; 
-
-
-            // reset the the global tester
-            for(int FuncIndex = 0; FuncIndex < ArrayCount(TestFuncs); ++FuncIndex)
+            for(;;)
             {
+                repetition_tester Testers[ArrayCount(TestFuncs)] = {};
 
-                repetition_tester *Tester = Testers + FuncIndex;
+                for(u32 FuncIndex = 0; FuncIndex < ArrayCount(TestFuncs); ++FuncIndex)
+                {
+                    repetition_tester *Tester = Testers + FuncIndex;
+                    test_function TestFunc = TestFuncs[FuncIndex];
 
-                test_function *Func = TestFuncs[FuncIndex];
-
-                // check if time to go has you know been too long
-                TestFunction.Func(Tester, &Params);
-
+                    printf("\n--- %s ---\n", TestFunc.TestName);
+                    NewTestWave(Tester, Params.Dest.Count, CPUTimerFreq); // leaving SecondsToTry defaulting to 10s
+                    TestFunc.Func(Tester, &Params);
+                }
             }
+
+            (void)&FreeBuffer; // avoiding unused function warning 
         }
-
-        
-
-
+        else
+        {
+            fprintf(stderr, "ERROR: Test data must be non zero\n");
+        }
     }
     else
     {
