@@ -171,7 +171,7 @@ static b32 IsTesting(repetition_tester *Tester)
                     if(Tester->PrintNewMinimums)
                     {
                         PrintTime("Min", Results->MinTime, Tester->CPUTimerFreq, Tester->BytesAccumulatedOnThisTest);
-                        printf("          \r");
+                        printf("                                                          \r");
                     }
                 }
 
@@ -186,7 +186,7 @@ static b32 IsTesting(repetition_tester *Tester)
         {
             Tester->Mode = TestMode_Completed;
 
-            printf("                           /r");
+            printf("                                                          \r");
             PrintResults(Tester->Results, Tester->CPUTimerFreq, Tester->TargetProcessedByteCount);  
         }
     }

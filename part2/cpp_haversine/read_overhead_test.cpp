@@ -17,13 +17,77 @@
 #include <fcntl.h>
 #include <io.h>
 
+enum allocation_type
+{
+    AllocType_none,
+    AllocType_malloc,
+
+    AllocType_Count,
+};
+
 struct read_parameters
 {
+    allocation_type AllocType;
     buffer Dest;
     char const *FileName;
 };
 
 typedef void read_overhead_test_func(repetition_tester *Tester, read_parameters *Params);
+
+static const char * DescribeAllocationType(allocation_type AllocType)
+{
+    char const *Result;
+    switch (AllocType)
+    {
+        case AllocType_malloc: {Result = "malloc";} break;
+        case AllocType_none: {Result = "";} break;
+        default: {Result = "UNKNOWN";} break; 
+    }
+    
+    return Result;
+}
+
+static void HandleAllocation(read_parameters *Params, buffer *Buffer)
+{
+    switch(Params->AllocType)
+    {
+        case AllocType_malloc:
+        {
+           *Buffer = AllocateBuffer(Params->Dest.Count); 
+        } break;
+
+        case AllocType_none: 
+        {
+
+        } break;
+
+        default: 
+        {
+            fprintf(stderr, "ERROR: Unrecognized allocation type");
+        } break;
+    }
+}
+
+static void HandleDeallocation(read_parameters *Params, buffer *Buffer)
+{
+    switch(Params->AllocType)
+    {
+        case AllocType_malloc:
+        {
+            FreeBuffer(Buffer);
+        } break;
+
+        case AllocType_none: 
+        {
+
+        } break;
+
+        default: 
+        {
+            fprintf(stderr, "ERROR: Unrecognized allocation type");
+        } break;
+    }
+}
 
 static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
 {
@@ -35,6 +99,7 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
         {
 
             buffer DestBuffer = Params->Dest;
+            HandleAllocation(Params, &DestBuffer);
 
             BeginTime(Tester);
             size_t Result = fread(DestBuffer.Data, DestBuffer.Count, 1, File);   
@@ -49,6 +114,7 @@ static void ReadViaFRead(repetition_tester *Tester, read_parameters *Params)
                 Error(Tester, "fread failed");
             }
 
+            HandleDeallocation(Params, &DestBuffer);
             fclose(File);
 
         }
@@ -69,7 +135,7 @@ static void ReadViaRead(repetition_tester *Tester, read_parameters *Params)
         {
 
             buffer DestBuffer = Params->Dest;
-
+            HandleAllocation(Params, &DestBuffer);
             
             u8 *Dest = DestBuffer.Data;
             u64 SizeRemaining = DestBuffer.Count;
@@ -98,6 +164,7 @@ static void ReadViaRead(repetition_tester *Tester, read_parameters *Params)
                 Dest += ReadSize;
             }
 
+            HandleDeallocation(Params, &DestBuffer);
             _close(File);
 
         }
@@ -117,6 +184,7 @@ static void ReadViaReadFile(repetition_tester *Tester, read_parameters *Params)
         if(File != INVALID_HANDLE_VALUE)
         {
             buffer DestBuffer = Params->Dest;
+            HandleAllocation(Params, &DestBuffer);
 
             u8 *Dest = DestBuffer.Data;
             u64 SizeRemaining = DestBuffer.Count;
@@ -145,7 +213,8 @@ static void ReadViaReadFile(repetition_tester *Tester, read_parameters *Params)
                 SizeRemaining -= ReadSize;
                 Dest += ReadSize;
             }
-
+            
+            HandleDeallocation(Params, &DestBuffer);
             CloseHandle(File);
         }
         else 

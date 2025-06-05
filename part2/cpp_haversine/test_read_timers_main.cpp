@@ -60,16 +60,24 @@ int main(int ArgCount, char **Args)
         {
             for(;;)
             {
-                repetition_tester Testers[ArrayCount(TestFuncs)] = {};
+                repetition_tester Testers[ArrayCount(TestFuncs)][AllocType_Count] = {};
 
                 for(u32 FuncIndex = 0; FuncIndex < ArrayCount(TestFuncs); ++FuncIndex)
                 {
-                    repetition_tester *Tester = Testers + FuncIndex;
-                    test_function TestFunc = TestFuncs[FuncIndex];
+                    for(u32 AllocType = 0; AllocType < AllocType_Count; ++AllocType)
+                    {
+                        Params.AllocType = (allocation_type)AllocType;
 
-                    printf("\n--- %s ---\n", TestFunc.TestName);
-                    NewTestWave(Tester, Params.Dest.Count, CPUTimerFreq); // leaving SecondsToTry defaulting to 10s
-                    TestFunc.Func(Tester, &Params);
+                        repetition_tester *Tester = &Testers[FuncIndex][AllocType];
+                        test_function TestFunc = TestFuncs[FuncIndex];
+
+                        printf("\n--- %s%s%s ---\n", 
+                            DescribeAllocationType(Params.AllocType),
+                            Params.AllocType ? " + " : "",
+                            TestFunc.TestName);
+                        NewTestWave(Tester, Params.Dest.Count, CPUTimerFreq); // leaving SecondsToTry defaulting to 10s
+                        TestFunc.Func(Tester, &Params);
+                    }
                 }
             }
 
