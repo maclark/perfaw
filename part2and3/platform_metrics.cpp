@@ -7,6 +7,14 @@ cout << "not on win32\n";
 
 #include <intrin.h>
 #include <windows.h>
+#include <psapi.h>
+
+struct os_metrics 
+{
+    b32 Initialized;
+    HANDLE ProcessHandle;
+};
+os_metrics GlobalMetrics;
 
 static u64 GetOSTimerFreq(void)
 {
@@ -21,6 +29,27 @@ static u64 ReadOSTimer(void)
     QueryPerformanceCounter(&Value);
     return Value.QuadPart;
 }
+
+static u64 ReadOSPageFaultCount(void)
+{
+    PROCESS_MEMORY_EX MemoryCounters = {};
+    MemoryCounters.cb = sizeof(MemoryCounters);
+    // Looks like we're casting _EX to its parent type maybe?
+    GetProcessMemoryInfo(GlobalMetrics.ProcessHandle, (PROCESS_MEMORY_COUNTERS *)&MemoryCounters, sizeof(MemoryCounters);
+
+    u64 Result = MemoryCounters.PageFaultCount;
+    return Result;
+}
+
+static void InitializeOSMetrics(void)
+{
+    if(!GlobalMetrics.Initialized)
+    {
+        GlobalMetrics.Initialized = true;
+        GlobaleMetrics.ProcessHandle = OpenProcess(PROCSES_QUERY_INFORMATION | PROCSES_VM_READ, FALSE, GetCurrentProcessId());
+    }
+}
+
 
 // casey note: this does not need to be "inline", it could just "static"
 // because compilers will inline it anyway. But compilers will warn about
