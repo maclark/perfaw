@@ -64,7 +64,7 @@ inline u64 ReadCPUTimer(void)
 }
 
 
-static u64 EstimateCPUFrequency(void)
+static u64 EstimateCPUFrequency(void) // hm, some of casey's files use CPUTimerFreq 
 {
     u64 HowLongToWait = 100; 
     u64 OSFreq = GetOSTimerFreq();
