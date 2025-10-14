@@ -1,1 +1,22 @@
-idk what i'm supposed to do right now
+use a good source of randomness
+
+#include <psapi.h>
+#pragma comment (lib, "advacpi32.lib")
+#pragma comment (lib, "bcrypt.lib")
+
+we want to test
+never taken
+always taken
+every 2nd, 3rd, 4th
+this is for data.
+so. 000000000000000
+111111111111111
+01010101
+001001
+0001001
+000010001
+
+or. what casey wants us to do is hw:
+look at the manuals (optimization manuals)
+intel optimization and agner fog manuals
+find my processor! (skylake, bc we're 6th gen)

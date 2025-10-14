@@ -55,9 +55,10 @@ int main(int ArgCount, char **Args)
     buffer Buffer = AllocateBuffer(1*1024*1024*1024);
     if(IsValid(Buffer))
     {
+        repetition_tester Testers[ArrayCount(TestFuncs)] = {};
+
         for(;;)
         {
-            repetition_tester Testers[ArrayCount(TestFuncs)] = {};
 
             for(u32 FuncIndex = 0; FuncIndex < ArrayCount(TestFuncs); ++FuncIndex)
             {
