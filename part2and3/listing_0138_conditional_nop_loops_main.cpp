@@ -74,7 +74,7 @@ static char const *FillWithBranchPattern(branch_pattern Pattern, buffer Buffer)
 
             u8 Value = 0;
 
-            switch (Pattern):
+            switch (Pattern)
             {
                 case BranchPattern_NeverTaken:
                 {

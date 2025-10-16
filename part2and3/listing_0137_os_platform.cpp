@@ -8,8 +8,8 @@ static u64 EstimateCPUTimerFreq(void);
 #include <windows.h>
 #include <psapi.h>
 
-#pragma comment (lib, "advapi32.lib")
-#pragma comment (lib, "bcrypt.lib")
+#pragma comment (lib, "advapi32.lib") // (see below) then is this doing nothing?
+#pragma comment (lib, "bcrypt.lib") // doesn't work with my compiler process
 
 struct os_platform
 {
@@ -41,6 +41,22 @@ static u64 ReadOSPageFaultCount(void)
     GetProcessMemoryInfo(GlobalOSPlatform.ProcessHandle, (PROCESS_MEMORY_COUNTERS *)&MemoryCounters, sizeof(MemoryCounters));
     
     u64 Result = MemoryCounters.PageFaultCount;
+    return Result;
+}
+
+static u64 GetMaxOSRandomCount(void)
+{
+    return 0xffffffff;
+}
+
+static b32 ReadOSRandomBytes(u64 Count, void *Dest) 
+{
+    b32 Result = false;
+    if(Count < GetMaxOSRandomCount())
+    {
+        Result = (BCryptGenRandom(0, (BYTE *)Dest, (u32)Count, BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0);
+    }
+
     return Result;
 }
 
@@ -137,21 +153,8 @@ static u64 ReadOSPageFaultCount(void)
     return Result;
 }
 
-static u64 GetMaxOSRandomCount(void)
-{
-    return 0xffffffff;
-}
-
-static b32 ReadOSRandomBytes(u64 Count, void *Dest) 
-{
-    b32 Result = false;
-    if(Count < GetMaxOSRandomCount())
-    {
-        Result = (BCrypGenRandom(0, (BYTE *)Dest, (u32)Count, BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0);
-    }
-
-    return Result;
-}
+// not bothering creating GetMaxOSRandomCount or ReadOSRandomBytes
+// for non Windows platforms
 
 static void InitializeOSPlatform(void)
 {
