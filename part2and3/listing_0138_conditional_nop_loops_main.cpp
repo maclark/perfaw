@@ -134,6 +134,7 @@ int main(int ArgCount, char **Args)
     InitializeOSPlatform();
 
     u64 Count = 1*1024*1024*1024;
+    // casey says we allocate an extra 8 so we can use regular mov  ?
     buffer Buffer = AllocateBuffer(Count + 8);
     if(IsValid(Buffer))
     {
@@ -152,7 +153,7 @@ int main(int ArgCount, char **Args)
                     test_function TestFunc = TestFuncs[FuncIndex];
 
                     printf("\n--- %s, %s ---\n", TestFunc.TestName, PatternName);
-                    NewTestWave(Tester, Buffer.Count, GetCPUTimerFreq());
+                    NewTestWave(Tester, Count, GetCPUTimerFreq());
 
                     while(IsTesting(Tester)) {
                         BeginTime(Tester);

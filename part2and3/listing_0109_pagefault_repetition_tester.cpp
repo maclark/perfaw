@@ -120,6 +120,8 @@ static void NewTestWave(repetition_tester *Tester, u64 TargetProcessedByteCount,
 
         if (Tester->TargetProcessedByteCount != TargetProcessedByteCount)
         {
+
+
             Error(Tester, "TesterProcessedByteCount changed");
         }
 
@@ -173,6 +175,7 @@ static b32 IsTesting(repetition_tester *Tester)
 
             if(Accum.E[RepValue_ByteCount] != Tester->TargetProcessedByteCount)
             {
+                fprintf(stderr, "Accum.E[RepValue_ByteCount] %llu != TargetProcessedCount %llu", Accum.E[RepValue_ByteCount], Tester->TargetProcessedByteCount);
                 Error(Tester, "Processed byte count mismatch");
             }
 
